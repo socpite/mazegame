@@ -12,12 +12,12 @@ pub fn main() !void {
     std.debug.print("{s}\n", .{hello_msg});
     const obj_json = try stream.reader().readUntilDelimiter(&buffer, '\n');
     const obj = try std.json.parseFromSlice(
-        gamelib.MazeBoard,
+        gamelib.Game,
         allocator,
         obj_json,
         .{},
     );
-    obj.deinit();
-    // std.debug.print("{}", .{obj.value.arr});
+    defer obj.deinit();
+    std.debug.print("{}", .{obj.value});
     std.debug.print("{s}\n", .{obj_json});
 }

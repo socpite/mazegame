@@ -2,6 +2,8 @@ const std = @import("std");
 const net = std.net;
 const posix = std.posix;
 const gamelib = @import("gamelib.zig");
+const WallType = gamelib.WallType;
+const Game = gamelib.Game;
 
 const PORT: u16 = 8080;
 
@@ -15,11 +17,8 @@ fn process_client(connection: net.Server.Connection) !void {
         std.debug.print("Client {} closed connecton", .{connection.address});
     }
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    const example_maze = try gamelib.MazeBoard.init(&arena, 5, 5);
-    example_maze.horizontal_walls[0][0] = true;
-    example_maze.vertical_walls[0][1] = true;
-
-    try std.json.stringify(example_maze, .{}, connection.stream.writer());
+    const new_game = try Game.init(&arena, 5, 5, null);
+    try std.json.stringify(new_game, .{}, connection.stream.writer());
     _ = try connection.stream.write("\n");
     connection.stream.close();
 }
