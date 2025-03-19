@@ -19,6 +19,6 @@ pub fn main() !void {
     );
     defer obj.deinit();
     std.debug.print("{}\n", .{obj.value});
-    std.debug.print("{}\n", .{try obj.value.check(allocator)});
+    std.debug.print("{}\n", .{try obj.value.check()});
     std.debug.print("{s}\n", .{obj_json});
 }

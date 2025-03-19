@@ -1,6 +1,9 @@
 const std = @import("std");
 const Queue = @import("queue.zig").Queue;
 pub const vec2 = @Vector(2, isize);
+var arena_allocator = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+var game_allocator = arena_allocator.allocator();
+
 const Direction = enum {
     Up,
     Down,
@@ -20,6 +23,18 @@ pub const WallType = enum {
     VisibleWall,
     NoWall,
     NotVisivle,
+    LuminatedWall,
+    BorderWall,
+
+    pub fn is_wall(wall: WallType) bool {
+        return switch (wall) {
+            WallType.VisibleWall => true,
+            WallType.NoWall => false,
+            WallType.NotVisivle => false,
+            WallType.LuminatedWall => true,
+            WallType.BorderWall => true,
+        };
+    }
 };
 pub const MazeBoard = struct {
     height: usize,
@@ -28,25 +43,24 @@ pub const MazeBoard = struct {
     horizontal_walls: [][]WallType,
     buffer_board: [][]i32,
     /// Default maze has border wall only
-    pub fn init(arena_allocator: *std.heap.ArenaAllocator, height: usize, width: usize) !MazeBoard {
-        const allocator = arena_allocator.allocator();
-        const vertical_walls = try allocator.alloc([]WallType, height);
-        const horizontal_walls = try allocator.alloc([]WallType, height + 1);
-        const buffer_board = try allocator.alloc([]i32, height);
+    pub fn init(height: usize, width: usize) !MazeBoard {
+        const vertical_walls = try game_allocator.alloc([]WallType, height);
+        const horizontal_walls = try game_allocator.alloc([]WallType, height + 1);
+        const buffer_board = try game_allocator.alloc([]i32, height);
         for (vertical_walls) |*rows| {
-            rows.* = try allocator.alloc(WallType, width + 1);
+            rows.* = try game_allocator.alloc(WallType, width + 1);
             @memset(rows.*, WallType.NoWall);
-            rows.*[0] = WallType.VisibleWall;
-            rows.*[width] = WallType.VisibleWall;
+            rows.*[0] = WallType.BorderWall;
+            rows.*[width] = WallType.BorderWall;
         }
         for (horizontal_walls) |*rows| {
-            rows.* = try allocator.alloc(WallType, width);
+            rows.* = try game_allocator.alloc(WallType, width);
             @memset(rows.*, WallType.NoWall);
         }
-        @memset(horizontal_walls[0], WallType.VisibleWall);
-        @memset(horizontal_walls[height], WallType.VisibleWall);
+        @memset(horizontal_walls[0], WallType.BorderWall);
+        @memset(horizontal_walls[height], WallType.BorderWall);
         for (buffer_board) |*rows| {
-            rows.* = try allocator.alloc(i32, width);
+            rows.* = try game_allocator.alloc(i32, width);
             @memset(rows.*, 0);
         }
         return MazeBoard{
@@ -113,8 +127,8 @@ pub const MazeBoard = struct {
 pub const Game = struct {
     board: MazeBoard,
     position: vec2,
-    pub fn init(arena_allocator: *std.heap.ArenaAllocator, height: usize, width: usize, start_position: ?vec2) !Game {
-        const new_board = try MazeBoard.init(arena_allocator, height, width);
+    pub fn init(height: usize, width: usize, start_position: ?vec2) !Game {
+        const new_board = try MazeBoard.init(height, width);
         const new_position = start_position orelse vec2{ 0, 0 };
         if (!new_board.check_inbound(new_position)) {
             return error.StartPositionOutOfBound;
@@ -145,8 +159,8 @@ pub const Game = struct {
         }
         try game.board.set_horizontal_wall(position, wall_value);
     }
-    pub fn check(game: Game, allocator: std.mem.Allocator) !bool {
-        var queue = try Queue(vec2).init(allocator, game.board.height * game.board.width);
+    pub fn check(game: Game) !bool {
+        var queue = try Queue(vec2).init(game_allocator, game.board.height * game.board.width);
         defer queue.deinit();
         game.board.set_all_buffer(-1);
         try queue.push(game.position);
@@ -162,12 +176,13 @@ pub const Game = struct {
                 if (try game.board.get_buffer_value(next_position) != -1) {
                     continue;
                 }
-                if (WallType.VisibleWall == switch (direction) {
+                const wall = switch (direction) {
                     Direction.Up => try game.board.get_horizontal_wall(current_position),
                     Direction.Down => try game.board.get_horizontal_wall(next_position),
                     Direction.Left => try game.board.get_vertical_wall(current_position),
                     Direction.Right => try game.board.get_vertical_wall(next_position),
-                }) {
+                };
+                if (WallType.is_wall(wall)) {
                     continue;
                 }
                 try game.board.set_buffer_value(next_position, current_value + 1);
@@ -175,5 +190,20 @@ pub const Game = struct {
             }
         }
         return queue.back == game.board.height * game.board.width;
+    }
+};
+
+const Item = struct {
+    impl: ItemImpl,
+
+    pub const ItemImpl = struct {
+        use: *const fn (game: *Game) void,
+        free: *const fn (game: *Game) void,
+    };
+    pub fn use(game: *Game) void {
+        return game.impl.use(game);
+    }
+    pub fn free(game: *Game) void {
+        return game.impl.free(game);
     }
 };
