@@ -1,8 +1,10 @@
 const std = @import("std");
+const StaticHttpFileServer = @import("StaticHttpFileServer");
 const net = std.net;
 const posix = std.posix;
 const gamelib = @import("gamelib.zig");
 
+const cwd = std.fs.cwd();
 const PORT: u16 = 8080;
 const PORT_HTTP: u16 = 8081;
 const MAX_BYTES: usize = (1 << 16);
@@ -48,30 +50,37 @@ fn run_http_server(server: *std.net.Server) !void {
         std.debug.print("Error opening html file: {}\n", .{err});
         return err;
     };
+    defer html_file.close();
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
+    const dir = try cwd.openDir("src", .{ .iterate = true });
+    var shfs = try StaticHttpFileServer.init(.{ .allocator = allocator, .root_dir = dir });
+    defer shfs.deinit(allocator);
     while (true) {
         const connection = try server.accept();
+        defer connection.stream.close();
         var buffer: [(1 << 16)]u8 = undefined;
         var http_server = std.http.Server.init(connection, buffer[0..]);
         var request = try http_server.receiveHead();
+        std.debug.print("{s}\n", .{request.head.target});
         var headers = request.iterateHeaders();
         std.debug.print("START\n", .{});
         while (headers.next()) |header| {
             std.debug.print("Header: {s} {s}\n", .{ header.name, header.value });
         }
         std.debug.print("END\n", .{});
-        const html_content = try html_file.readToEndAlloc(allocator, MAX_BYTES);
-        defer allocator.free(html_content);
-        request.respond(html_content, .{}) catch |err| {
-            std.debug.print("Error responding to request: {}\n", .{err});
-        };
+        try shfs.serve(&request);
+        // const html_content = try html_file.readToEndAlloc(allocator, MAX_BYTES);
+        // defer allocator.free(html_content);
+        // request.respond(html_content, .{}) catch |err| {
+        // std.debug.print("Error responding to request: {}\n", .{err});
+        // };
     }
 }
 
 pub fn main() !void {
     const addr = try net.Address.parseIp("127.0.0.1", PORT);
-    const addr_http = try net.Address.parseIp("127.0.0.1", PORT_HTTP);
+    const addr_http = try net.Address.parseIp("100.64.0.111", PORT_HTTP);
     var server = try net.Address.listen(addr, .{ .reuse_address = true });
     var http_server = try net.Address.listen(addr_http, .{ .reuse_address = true });
     defer server.deinit();
