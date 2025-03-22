@@ -36,33 +36,55 @@ pub const WallType = enum {
         };
     }
 };
+
+fn check_inbound_arr2d(comptime T: type, arr: [][]T, position: vec2) bool {
+    return 0 <= position[0] and position[0] < arr.len and 0 <= position[1] and position[1] < arr[0].len;
+}
+
+fn set_arr2d(comptime T: type, arr: [][]T, value: T, position: vec2) !void {
+    if (!check_inbound_arr2d(T, arr, position)) {
+        return error.OutOfBound;
+    }
+    arr[@intCast(position[0])][@intCast(position[1])] = value;
+}
+
 pub const MazeBoard = struct {
     height: usize,
     width: usize,
     vertical_walls: [][]WallType,
     horizontal_walls: [][]WallType,
     buffer_board: [][]i32,
+    item_board: [][]?Item,
     /// Default maze has border wall only
     pub fn init(height: usize, width: usize) !MazeBoard {
         const vertical_walls = try game_allocator.alloc([]WallType, height);
-        const horizontal_walls = try game_allocator.alloc([]WallType, height + 1);
-        const buffer_board = try game_allocator.alloc([]i32, height);
         for (vertical_walls) |*rows| {
             rows.* = try game_allocator.alloc(WallType, width + 1);
             @memset(rows.*, WallType.NoWall);
             rows.*[0] = WallType.BorderWall;
             rows.*[width] = WallType.BorderWall;
         }
+
+        const horizontal_walls = try game_allocator.alloc([]WallType, height + 1);
         for (horizontal_walls) |*rows| {
             rows.* = try game_allocator.alloc(WallType, width);
             @memset(rows.*, WallType.NoWall);
         }
         @memset(horizontal_walls[0], WallType.BorderWall);
         @memset(horizontal_walls[height], WallType.BorderWall);
+
+        const buffer_board = try game_allocator.alloc([]i32, height);
         for (buffer_board) |*rows| {
             rows.* = try game_allocator.alloc(i32, width);
             @memset(rows.*, 0);
         }
+
+        const item_board = try game_allocator.alloc([]Item, height);
+        for (item_board) |*rows| {
+            rows.* = try game_allocator.alloc(Item, width);
+            @memset(rows.*, null);
+        }
+
         return MazeBoard{
             .height = height,
             .width = width,
@@ -72,13 +94,13 @@ pub const MazeBoard = struct {
         };
     }
     fn check_inbound(mazeboard: MazeBoard, position: vec2) bool {
-        return 0 <= position[0] and position[0] < mazeboard.height and 0 <= position[1] and position[1] < mazeboard.width;
+        return check_inbound_arr2d(i32, mazeboard.buffer_board, position);
     }
     fn check_inbound_vertical_wall(mazeboard: MazeBoard, position: vec2) bool {
-        return 0 <= position[0] and position[0] < mazeboard.height and 0 <= position[1] and position[1] <= mazeboard.width;
+        return check_inbound_arr2d(WallType, mazeboard.vertical_walls, position);
     }
     fn check_inbound_horizontal_wall(mazeboard: MazeBoard, position: vec2) bool {
-        return 0 <= position[0] and position[0] <= mazeboard.height and 0 <= position[1] and position[1] < mazeboard.width;
+        return check_inbound_arr2d(WallType, mazeboard.horizontal_walls, position);
     }
     fn set_all_buffer(mazeboard: MazeBoard, value: i32) void {
         for (mazeboard.buffer_board) |*rows| {
@@ -127,7 +149,8 @@ pub const MazeBoard = struct {
 pub const Game = struct {
     board: MazeBoard,
     position: vec2,
-    pub fn init(height: usize, width: usize, start_position: ?vec2) !Game {
+    item_list: []Item,
+    pub fn init(height: usize, width: usize, start_position: ?vec2, item_list: []Item) !Game {
         const new_board = try MazeBoard.init(height, width);
         const new_position = start_position orelse vec2{ 0, 0 };
         if (!new_board.check_inbound(new_position)) {
@@ -136,6 +159,7 @@ pub const Game = struct {
         return Game{
             .board = new_board,
             .position = new_position,
+            .item_list = item_list,
         };
     }
     pub fn set_position(game: *Game, position: vec2) !void {
@@ -194,16 +218,6 @@ pub const Game = struct {
 };
 
 const Item = struct {
-    impl: ItemImpl,
-
-    pub const ItemImpl = struct {
-        use: *const fn (game: *Game) void,
-        free: *const fn (game: *Game) void,
-    };
-    pub fn use(game: *Game) void {
-        return game.impl.use(game);
-    }
-    pub fn free(game: *Game) void {
-        return game.impl.free(game);
-    }
+    apply: *const fn (*Game) void,
+    free: *const fn (*Game) void,
 };
