@@ -1,48 +1,46 @@
 const std = @import("std");
+
 const StaticHttpFileServer = @import("StaticHttpFileServer");
-const net = std.net;
-const posix = std.posix;
-const gamelib = @import("gamelib.zig");
+const Connection = std.net.Server.Connection;
+const Items = @import("item.zig");
+const Net = std.net;
+const Posix = std.posix;
+const GameLib = @import("gamelib.zig");
+const GameServer = @import("gameserver.zig");
 
 const cwd = std.fs.cwd();
 const PORT: u16 = 8080;
 const PORT_HTTP: u16 = 8081;
 const MAX_BYTES: usize = (1 << 16);
 
-fn process_client(connection: net.Server.Connection) !void {
-    std.debug.print("Thread opened with client {}\n", .{connection.address});
-    const write_length = connection.stream.write("Hi From Server\n") catch |err| {
-        std.debug.print("Unable to write to client {} with error: {}\n", .{ connection.address, err });
-        return err;
-    };
-    if (write_length == 0) {
-        std.debug.print("Client {} closed connecton", .{connection.address});
-    }
-    var game = try gamelib.Game.init(10, 10, null);
-    try game.set_horizontal_wall(gamelib.vec2{ 2, 2 }, gamelib.WallType.VisibleWall);
-    try game.set_vertical_wall(gamelib.vec2{ 2, 2 }, gamelib.WallType.VisibleWall);
+fn matchClients(client_1: Connection, client_2: Connection) !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var aa = std.heap.ArenaAllocator.init(gpa.allocator());
 
-    try std.json.stringify(game, .{}, connection.stream.writer());
-    _ = try connection.stream.write("\n");
-    connection.stream.close();
+    const allocator = aa.allocator();
+    var series = try GameServer.Series.init(allocator, client_1, client_2);
+    try series.start();
 }
 
-fn game_server(server: *std.net.Server) !void {
+fn runGameServer(server: *std.net.Server) !void {
+    var queue: ?Connection = null;
     while (true) {
         const connection = server.accept() catch |err| {
             std.debug.print("Error accpeting connection: {}\n", .{err});
             return err;
         };
         std.debug.print("Connected client with address {}\n", .{connection.address});
-        const new_thread = std.Thread.spawn(.{}, process_client, .{connection}) catch |err| {
-            std.debug.print("Error opening thead: {}\n", .{err});
-            return err;
-        };
-        new_thread.detach();
+        if (queue) |client_1| {
+            const client_2 = connection;
+            const match_thread = try std.Thread.spawn(.{}, matchClients, .{ client_1, client_2 });
+            match_thread.detach();
+        } else {
+            queue = connection;
+        }
     }
 }
 
-fn run_http_server(server: *std.net.Server) !void {
+fn runHttpServer(server: *std.net.Server) !void {
     const html_file = std.fs.cwd().openFile(
         "src/index.html",
         .{ .mode = .read_only },
@@ -70,6 +68,7 @@ fn run_http_server(server: *std.net.Server) !void {
         }
         std.debug.print("END\n", .{});
         try shfs.serve(&request);
+
         // const html_content = try html_file.readToEndAlloc(allocator, MAX_BYTES);
         // defer allocator.free(html_content);
         // request.respond(html_content, .{}) catch |err| {
@@ -79,16 +78,16 @@ fn run_http_server(server: *std.net.Server) !void {
 }
 
 pub fn main() !void {
-    const addr = try net.Address.parseIp("127.0.0.1", PORT);
-    const addr_http = try net.Address.parseIp("100.64.0.111", PORT_HTTP);
-    var server = try net.Address.listen(addr, .{ .reuse_address = true });
-    var http_server = try net.Address.listen(addr_http, .{ .reuse_address = true });
+    const addr = try Net.Address.parseIp("127.0.0.1", PORT);
+    const addr_http = try Net.Address.parseIp("192.168.1.230", PORT_HTTP);
+    var server = try Net.Address.listen(addr, .{ .reuse_address = true });
+    var http_server = try Net.Address.listen(addr_http, .{ .reuse_address = true });
     defer server.deinit();
     defer http_server.deinit();
     std.debug.print("Server hosted on port {}\n", .{PORT});
     std.debug.print("HTTP Server hosted on port {}\n", .{PORT_HTTP});
-    const game_server_thread = try std.Thread.spawn(.{}, game_server, .{&server});
-    const http_server_thread = try std.Thread.spawn(.{}, run_http_server, .{&http_server});
+    const game_server_thread = try std.Thread.spawn(.{}, runGameServer, .{&server});
+    const http_server_thread = try std.Thread.spawn(.{}, runHttpServer, .{&http_server});
     game_server_thread.join();
     http_server_thread.join();
 }

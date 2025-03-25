@@ -1,18 +1,18 @@
 const std = @import("std");
-const net = std.net;
-const gamelib = @import("gamelib.zig");
+const Net = std.net;
+const GameLib = @import("gamelib.zig");
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
-    const address = try net.Address.parseIp("127.0.0.1", 8080);
-    const stream = try net.tcpConnectToAddress(address);
+    const address = try Net.Address.parseIp("127.0.0.1", 8080);
+    const stream = try Net.tcpConnectToAddress(address);
     var buffer: [1 << 16]u8 = undefined;
     const hello_msg = try stream.reader().readUntilDelimiter(&buffer, '\n');
     std.debug.print("{s}\n", .{hello_msg});
     const obj_json = try stream.reader().readUntilDelimiter(&buffer, '\n');
     const obj = try std.json.parseFromSlice(
-        gamelib.Game,
+        GameLib.Game,
         allocator,
         obj_json,
         .{},

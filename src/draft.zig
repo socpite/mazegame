@@ -1,18 +1,18 @@
 const std = @import("std");
 
-const sustype = struct {
+const TestStruct = struct {
     var x: i32 = 0;
-    fn inc() void {
+    fn increment() void {
         x += 1;
     }
 };
 
-const a = sustype;
-const b = sustype;
+const a = TestStruct;
+const b = TestStruct;
 
 pub fn main() !void {
-    a.inc();
-    a.inc();
-    b.inc();
+    a.increment();
+    a.increment();
+    b.increment();
     std.debug.print("a.x = {}, b.x = {}\n", .{ a.x, b.x });
 }

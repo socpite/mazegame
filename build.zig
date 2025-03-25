@@ -16,7 +16,7 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     const lib = b.addStaticLibrary(.{
-        .name = "networking",
+        .name = "mazegame",
         // In this case the main source file is merely a path, however, in more
         // complicated build scripts, this could be a generated file.
         .root_source_file = b.path("src/root.zig"),
@@ -29,11 +29,14 @@ pub fn build(b: *std.Build) void {
     // running `zig build`).
     b.installArtifact(lib);
 
-    const exe = b.addExecutable(.{
-        .name = "networking",
+    const module = b.addModule("mazegame", .{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
+    });
+    const exe = b.addExecutable(.{
+        .name = "mazegame",
+        .root_module = module,
     });
 
     const file_server = b.dependency("StaticHttpFileServer", .{
@@ -53,11 +56,10 @@ pub fn build(b: *std.Build) void {
     const run_cmd = b.addRunArtifact(exe);
 
     const exe_check = b.addExecutable(.{
-        .name = "foo",
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = optimize,
+        .name = "mazegame",
+        .root_module = module,
     });
+    exe_check.root_module.addImport("StaticHttpFileServer", file_server_module);
     const check = b.step("check", "Check if foo compiles");
     check.dependOn(&exe_check.step);
     // By making the run step depend on the install step, it will be run from the
