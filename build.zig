@@ -29,14 +29,20 @@ pub fn build(b: *std.Build) void {
     // running `zig build`).
     b.installArtifact(lib);
 
-    const module = b.addModule("mazegame", .{
+    const check = b.step("check", "Check if foo compiles");
+
+    //----------------------------------------------------------------------
+    // Server
+    // ---------------------------------------------------------------------
+
+    const server_module = b.addModule("mazegame", .{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
-    const exe = b.addExecutable(.{
-        .name = "mazegame",
-        .root_module = module,
+    const server = b.addExecutable(.{
+        .name = "server",
+        .root_module = server_module,
     });
 
     const file_server = b.dependency("StaticHttpFileServer", .{
@@ -44,42 +50,55 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     const file_server_module = file_server.module("StaticHttpFileServer");
-    exe.root_module.addImport("StaticHttpFileServer", file_server_module);
-    // This declares intent for the executable to be installed into the
-    // standard location when the user invokes the "install" step (the default
-    // step when running `zig build`).
-    b.installArtifact(exe);
+    server.root_module.addImport("StaticHttpFileServer", file_server_module);
+    b.installArtifact(server);
 
-    // This *creates* a Run step in the build graph, to be executed when another
-    // step is evaluated that depends on it. The next line below will establish
-    // such a dependency.
-    const run_cmd = b.addRunArtifact(exe);
+    const server_run_exe = b.addRunArtifact(server);
 
-    const exe_check = b.addExecutable(.{
+    const server_check = b.addExecutable(.{
         .name = "mazegame",
-        .root_module = module,
+        .root_module = server_module,
     });
-    exe_check.root_module.addImport("StaticHttpFileServer", file_server_module);
-    const check = b.step("check", "Check if foo compiles");
-    check.dependOn(&exe_check.step);
-    // By making the run step depend on the install step, it will be run from the
-    // installation directory rather than directly from within the cache directory.
-    // This is not necessary, however, if the application depends on other installed
-    // files, this ensures they will be present and in the expected location.
-    run_cmd.step.dependOn(b.getInstallStep());
+    server_check.root_module.addImport("StaticHttpFileServer", file_server_module);
+    check.dependOn(&server_check.step);
+    server_run_exe.step.dependOn(b.getInstallStep());
 
-    // This allows the user to pass arguments to the application in the build
-    // command itself, like this: `zig build run -- arg1 arg2 etc`
     if (b.args) |args| {
-        run_cmd.addArgs(args);
+        server_run_exe.addArgs(args);
     }
 
-    // This creates a build step. It will be visible in the `zig build --help` menu,
-    // and can be selected like this: `zig build run`
-    // This will evaluate the `run` step rather than the default, which is "install".
-    const run_step = b.step("run", "Run the app");
-    run_step.dependOn(&run_cmd.step);
+    const run_server_step = b.step("server", "Start the server");
+    run_server_step.dependOn(&server_run_exe.step);
 
+    //----------------------------------------------------------------------
+    // Client
+    // ---------------------------------------------------------------------
+
+    const client_module = b.addModule("mazegame", .{
+        .root_source_file = b.path("src/client.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const client = b.addExecutable(.{
+        .name = "client",
+        .root_module = client_module,
+    });
+    b.installArtifact(client);
+    const client_run_exe = b.addRunArtifact(client);
+    client_run_exe.step.dependOn(b.getInstallStep());
+
+    const client_check = b.addExecutable(.{
+        .name = "mazegame",
+        .root_module = client_module,
+    });
+    check.dependOn(&client_check.step);
+
+    if (b.args) |args| {
+        client_run_exe.addArgs(args);
+    }
+
+    const run_client_step = b.step("client", "Start the client");
+    run_client_step.dependOn(&client_run_exe.step);
     // Creates a step for unit testing. This only builds the test executable
     // but does not run it.
     const lib_unit_tests = b.addTest(.{

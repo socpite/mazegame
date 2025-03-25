@@ -63,6 +63,7 @@ const AllItemType = enum {
     Bomb,
 };
 
+/// Caller owns the item
 pub fn strToItem(name: []const u8, allocator: std.mem.Allocator) !Item {
     const item_type = std.meta.stringToEnum(AllItemType, name).?;
     return switch (item_type) {
@@ -70,7 +71,7 @@ pub fn strToItem(name: []const u8, allocator: std.mem.Allocator) !Item {
     };
 }
 
-pub fn jsonToItem(json: []const u8, allocator: std.mem.Allocator) !Item {
+pub fn jsonToItem(json: []const u8, arena: std.mem.Allocator) !Item {
     const typename_end = std.mem.indexOfScalar(u8, json, ';') orelse {
         return error.WrongItemFormat;
     };
@@ -80,8 +81,16 @@ pub fn jsonToItem(json: []const u8, allocator: std.mem.Allocator) !Item {
     const item_content = json[typename_end + 1 ..];
     return switch (item_type) {
         .Bomb => {
-            var bomb = try std.json.parseFromSliceLeaky(Bomb, allocator, item_content, .{});
+            var bomb = try std.json.parseFromSliceLeaky(Bomb, arena, item_content, .{});
             return bomb.asItem();
         },
     };
+}
+
+pub fn genItemList(name_list: []const []const u8, allocator: std.mem.Allocator) ![]GameLib.Item {
+    var array = std.ArrayList(GameLib.Item).init(allocator);
+    for (name_list) |name| {
+        try array.append(try strToItem(name, allocator));
+    }
+    return try array.toOwnedSlice();
 }

@@ -60,8 +60,7 @@ const Match = struct {
             .gamer_client = gamer_client,
             .game = try GameLib.Game.init(
                 allocator,
-                20,
-                20,
+                .{},
                 GameLib.Vec2{ 0, 0 },
                 try genItemList(&.{"Bomb"}, allocator),
             ),
@@ -75,6 +74,9 @@ const Match = struct {
         };
         return self.messageFinished(result);
     }
+    fn deinit(self: *Match) void {
+        self.game.deinit();
+    }
 };
 
 pub const Series = struct {
@@ -85,8 +87,8 @@ pub const Series = struct {
     pub fn init(allocator: std.mem.Allocator, client_1: Connection, client_2: Connection) !Series {
         return Series{
             .allocator = allocator,
-            .client_1 = Client{ .connection = client_1 },
-            .client_2 = Client{ .connection = client_2 },
+            .client_1 = Client{ .stream = client_1.stream },
+            .client_2 = Client{ .stream = client_2.stream },
         };
     }
     pub fn start(self: *Series) !void {

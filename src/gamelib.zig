@@ -2,6 +2,7 @@ const std = @import("std");
 const ItemLib = @import("item.zig");
 const Queue = @import("queue.zig").Queue;
 pub const Vec2 = @Vector(2, isize);
+const expect = std.testing.expect;
 
 const Direction = enum {
     Up,
@@ -62,32 +63,32 @@ pub const MazeBoard = struct {
     buffer_board: [][]i32,
     item_board: [][]?[]const u8,
     /// Default maze has border wall only
-    pub fn init(allocator: std.mem.Allocator, height: usize, width: usize) !MazeBoard {
-        const vertical_walls = try allocator.alloc([]WallType, height);
+    pub fn init(arena: std.mem.Allocator, height: usize, width: usize) !MazeBoard {
+        const vertical_walls = try arena.alloc([]WallType, height);
         for (vertical_walls) |*rows| {
-            rows.* = try allocator.alloc(WallType, width + 1);
+            rows.* = try arena.alloc(WallType, width + 1);
             @memset(rows.*, WallType.NoWall);
             rows.*[0] = WallType.BorderWall;
             rows.*[width] = WallType.BorderWall;
         }
 
-        const horizontal_walls = try allocator.alloc([]WallType, height + 1);
+        const horizontal_walls = try arena.alloc([]WallType, height + 1);
         for (horizontal_walls) |*rows| {
-            rows.* = try allocator.alloc(WallType, width);
+            rows.* = try arena.alloc(WallType, width);
             @memset(rows.*, WallType.NoWall);
         }
         @memset(horizontal_walls[0], WallType.BorderWall);
         @memset(horizontal_walls[height], WallType.BorderWall);
 
-        const buffer_board = try allocator.alloc([]i32, height);
+        const buffer_board = try arena.alloc([]i32, height);
         for (buffer_board) |*rows| {
-            rows.* = try allocator.alloc(i32, width);
+            rows.* = try arena.alloc(i32, width);
             @memset(rows.*, 0);
         }
 
-        const item_board = try allocator.alloc([]?[]const u8, height);
+        const item_board = try arena.alloc([]?[]const u8, height);
         for (item_board) |*rows| {
-            rows.* = try allocator.alloc(?[]const u8, width);
+            rows.* = try arena.alloc(?[]const u8, width);
             @memset(rows.*, null);
         }
 
@@ -142,18 +143,34 @@ pub const Game = struct {
     board: MazeBoard,
     position: Vec2,
     item_list: []Item,
-    allocator: std.mem.Allocator,
-    pub fn init(allocator: std.mem.Allocator, height: usize, width: usize, start_position: ?Vec2, item_list: []Item) !Game {
-        const new_board = try MazeBoard.init(allocator, height, width);
+    arena: std.mem.Allocator,
+    /// Default height and width is 10
+    const MazeOptions = struct {
+        height: usize = 10,
+        width: usize = 10,
+        board: ?MazeBoard = null,
+    };
+    /// item_list is copied
+    pub fn init(
+        arena: std.mem.Allocator,
+        maze_options: MazeOptions,
+        start_position: ?Vec2,
+        item_list: []const Item,
+    ) !Game {
+        const new_board = maze_options.board orelse try MazeBoard.init(
+            arena,
+            maze_options.height,
+            maze_options.width,
+        );
         const new_position = start_position orelse Vec2{ 0, 0 };
         if (!new_board.checkInbound(new_position)) {
             return error.StartPositionOutOfBound;
         }
         return Game{
-            .allocator = allocator,
+            .arena = arena,
             .board = new_board,
             .position = new_position,
-            .item_list = item_list,
+            .item_list = try arena.dupe(Item, item_list),
         };
     }
     pub fn setPosition(game: *Game, position: Vec2) !void {
@@ -180,7 +197,7 @@ pub const Game = struct {
     /// All border must be wall
     /// All tiles should be connected
     pub fn check(game: Game) error{OutOfMemory}!bool {
-        var queue = try Queue(Vec2).init(game.allocator, game.board.height * game.board.width);
+        var queue = try Queue(Vec2).init(game.arena, game.board.height * game.board.width);
         defer queue.deinit();
         game.board.setAllBuffer(-1);
         queue.push(game.position) catch unreachable;
@@ -212,9 +229,9 @@ pub const Game = struct {
         return queue.back == game.board.height * game.board.width;
     }
     pub fn getGameJSON(self: Game) !GameJSON {
-        const item_list = try self.allocator.alloc([]u8, self.item_list.len);
+        const item_list = try self.arena.alloc([]u8, self.item_list.len);
         for (item_list, self.item_list) |*item_json, item| {
-            item_json.* = try item.jsonStringify(self.allocator);
+            item_json.* = try item.jsonStringify(self.arena);
         }
         return GameJSON{
             .board = self.board,
@@ -228,17 +245,12 @@ pub const GameJSON = struct {
     board: MazeBoard,
     position: Vec2,
     item_list: [][]u8,
-    pub fn getGame(self: GameJSON, allocator: std.mem.Allocator) !Game {
-        const item_list = try allocator.alloc(Item, self.item_list.len);
+    pub fn getGame(self: GameJSON, arena: std.mem.Allocator) !Game {
+        const item_list = try arena.alloc(Item, self.item_list.len);
         for (item_list, self.item_list) |*item, item_json| {
-            item.* = try ItemLib.jsonToItem(item_json, allocator);
+            item.* = try ItemLib.jsonToItem(item_json, arena);
         }
-        return Game{
-            .allocator = allocator,
-            .board = self.board,
-            .position = self.position,
-            .item_list = item_list,
-        };
+        return try Game.init(arena, Game.MazeOptions{ .board = self.board }, self.position, item_list);
     }
 };
 
@@ -264,3 +276,21 @@ pub const Item = struct {
         return self.impl.json_stringify(self.ptr, allocator);
     }
 };
+
+test "ConvertGameToJson" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var arena = std.heap.ArenaAllocator.init(gpa.allocator());
+    const allocator = arena.allocator();
+    const game = try Game.init(
+        allocator,
+        Game.MazeOptions{ .height = 10, .width = 10 },
+        null,
+        &.{try ItemLib.Bomb.newItem(allocator)},
+    );
+    try expect(game.item_list.len == 1);
+    try expect(std.mem.eql(u8, game.item_list[0].name, "Bomb"));
+    const game_json = try game.getGameJSON();
+    const new_game = try game_json.getGame(allocator);
+    try expect(new_game.board.height == 10);
+    try expect(new_game.board.width == 10);
+}
