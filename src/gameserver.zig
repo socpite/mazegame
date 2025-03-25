@@ -5,14 +5,6 @@ const Self = @This();
 const Connection = std.net.Server.Connection;
 const Client = @import("netclient.zig").Client;
 
-pub fn genItemList(name_list: []const []const u8, allocator: std.mem.Allocator) ![]GameLib.Item {
-    var array = std.ArrayList(GameLib.Item).init(allocator);
-    for (name_list) |name| {
-        try array.append(try Items.strToItem(name, allocator));
-    }
-    return try array.toOwnedSlice();
-}
-
 const Match = struct {
     game: GameLib.Game,
     mazer_client: *Client,
@@ -45,11 +37,22 @@ const Match = struct {
         }
     }
     fn requestMaze(self: *Match) !void {
-        try self.mazer_client.writeMessage("Request maze");
-        try self.mazer_client.writeJson(try self.game.getGameJSON());
-        const json_game_received = try self.mazer_client.readJson(self.allocator, GameLib.GameJSON);
-        self.game = try json_game_received.getGame(self.allocator);
-        if (!try self.game.check()) {
+        var arena = std.heap.ArenaAllocator.init(self.allocator);
+        defer arena.deinit();
+        const arena_allocator = arena.allocator();
+        try self.mazer_client.writeMessage(Client.REQUEST_MAZE_PROTOCOL);
+        try self.mazer_client.writeJSON(try GameLib.getJSONFromGame(
+            self.game,
+            arena_allocator,
+        ));
+        const json_game_received = try self.mazer_client.readJSON(
+            arena_allocator,
+            GameLib.GameJSON,
+        );
+        self.game = try GameLib.getGameFromJSON(json_game_received, self.allocator);
+        const check_result = try self.game.check();
+        if (check_result != .Valid) {
+            std.debug.print("Maze check failed with status: {}\n", .{check_result});
             return MatchError.InvalidMaze;
         }
     }
@@ -62,12 +65,12 @@ const Match = struct {
                 allocator,
                 .{},
                 GameLib.Vec2{ 0, 0 },
-                try genItemList(&.{"Bomb"}, allocator),
+                try Items.genItemList(&.{"Bomb"}, allocator),
             ),
         };
     }
     fn start(self: *Match) !void {
-        var result = MatchResult.Error;
+        var result = MatchResult.MazerWin;
         self.requestMaze() catch |err| {
             std.debug.print("Request maze failed: {}\n", .{err});
             result = MatchResult.GamerWin;
@@ -79,6 +82,7 @@ const Match = struct {
     }
 };
 
+/// A series of matches between two clients. Does not need to deinit.
 pub const Series = struct {
     allocator: std.mem.Allocator,
     client_1: Client,

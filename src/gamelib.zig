@@ -143,7 +143,8 @@ pub const Game = struct {
     board: MazeBoard,
     position: Vec2,
     item_list: []Item,
-    arena: std.mem.Allocator,
+    arena: std.heap.ArenaAllocator,
+    allocator: std.mem.Allocator,
     /// Default height and width is 10
     const MazeOptions = struct {
         height: usize = 10,
@@ -152,13 +153,13 @@ pub const Game = struct {
     };
     /// item_list is copied
     pub fn init(
-        arena: std.mem.Allocator,
+        allocator: std.mem.Allocator,
         maze_options: MazeOptions,
         start_position: ?Vec2,
         item_list: []const Item,
     ) !Game {
         const new_board = maze_options.board orelse try MazeBoard.init(
-            arena,
+            allocator,
             maze_options.height,
             maze_options.width,
         );
@@ -167,10 +168,11 @@ pub const Game = struct {
             return error.StartPositionOutOfBound;
         }
         return Game{
-            .arena = arena,
+            .arena = std.heap.ArenaAllocator.init(allocator),
+            .allocator = allocator,
             .board = new_board,
             .position = new_position,
-            .item_list = try arena.dupe(Item, item_list),
+            .item_list = try allocator.dupe(Item, item_list),
         };
     }
     pub fn setPosition(game: *Game, position: Vec2) !void {
@@ -183,21 +185,24 @@ pub const Game = struct {
         try game.setPosition(game.position + direction.getVec2());
     }
     pub fn setVerticalWall(game: *Game, position: Vec2, wall_value: WallType) !void {
-        if (!game.board.checkInboundVerticalWall(position)) {
-            return error.OutOfBound;
-        }
         try game.board.setVerticalWall(position, wall_value);
     }
     pub fn setHorizontalWall(game: *Game, position: Vec2, wall_value: WallType) !void {
-        if (!game.board.checkInboundHorizontalWall(position)) {
-            return error.OutOfBound;
-        }
         try game.board.setHorizontalWall(position, wall_value);
     }
+
+    const CheckStatus = enum {
+        Valid,
+        CanGoOutside,
+        NotConnected,
+    };
     /// All border must be wall
     /// All tiles should be connected
-    pub fn check(game: Game) error{OutOfMemory}!bool {
-        var queue = try Queue(Vec2).init(game.arena, game.board.height * game.board.width);
+    pub fn check(game: Game) error{OutOfMemory}!CheckStatus {
+        var queue = try Queue(Vec2).init(
+            game.allocator,
+            game.board.height * game.board.width,
+        );
         defer queue.deinit();
         game.board.setAllBuffer(-1);
         queue.push(game.position) catch unreachable;
@@ -213,45 +218,64 @@ pub const Game = struct {
                     .Left => game.board.getVerticalWall(current_position) catch unreachable,
                     .Right => game.board.getVerticalWall(next_position) catch unreachable,
                 };
-                if (!game.board.checkInbound(next_position)) {
-                    return false;
-                }
-                if (game.board.getBufferValue(next_position) catch unreachable != -1) {
+                if (WallType.isWall(wall)) {
                     continue;
                 }
-                if (WallType.isWall(wall)) {
+                if (!game.board.checkInbound(next_position)) {
+                    return .CanGoOutside;
+                }
+                if (game.board.getBufferValue(next_position) catch unreachable != -1) {
                     continue;
                 }
                 game.board.setBufferValue(next_position, current_value + 1) catch unreachable;
                 queue.push(next_position) catch unreachable;
             }
         }
-        return queue.back == game.board.height * game.board.width;
-    }
-    pub fn getGameJSON(self: Game) !GameJSON {
-        const item_list = try self.arena.alloc([]u8, self.item_list.len);
-        for (item_list, self.item_list) |*item_json, item| {
-            item_json.* = try item.jsonStringify(self.arena);
+        if (queue.back == game.board.height * game.board.width) {
+            return .Valid;
+        } else {
+            return .NotConnected;
         }
-        return GameJSON{
-            .board = self.board,
-            .position = self.position,
-            .item_list = item_list,
-        };
+    }
+    pub fn deit(self: *Game) void {
+        self.arena.deinit();
+        self.allocator.free(self.item_list);
     }
 };
 
+/// Caller owns the game_json
+pub fn getJSONFromGame(game: Game, arena: std.mem.Allocator) !GameJSON {
+    const item_list = try arena.alloc([]u8, game.item_list.len);
+    for (item_list, game.item_list) |*item_json, item| {
+        item_json.* = try item.jsonStringify(arena);
+    }
+    return GameJSON{
+        .board = game.board,
+        .position = game.position,
+        .item_list = item_list,
+    };
+}
+
+/// Caller owns the game
+pub fn getGameFromJSON(game_json: GameJSON, allocator: std.mem.Allocator) !Game {
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    const arena_allocator = arena.allocator();
+    const item_list = try allocator.alloc(Item, game_json.item_list.len);
+    for (item_list, game_json.item_list) |*item, item_json| {
+        item.* = try ItemLib.jsonToItem(item_json, arena_allocator);
+    }
+    return try Game.init(
+        allocator,
+        Game.MazeOptions{ .board = game_json.board },
+        game_json.position,
+        item_list,
+    );
+}
 pub const GameJSON = struct {
     board: MazeBoard,
     position: Vec2,
     item_list: [][]u8,
-    pub fn getGame(self: GameJSON, arena: std.mem.Allocator) !Game {
-        const item_list = try arena.alloc(Item, self.item_list.len);
-        for (item_list, self.item_list) |*item, item_json| {
-            item.* = try ItemLib.jsonToItem(item_json, arena);
-        }
-        return try Game.init(arena, Game.MazeOptions{ .board = self.board }, self.position, item_list);
-    }
 };
 
 pub const Item = struct {
@@ -280,17 +304,21 @@ pub const Item = struct {
 test "ConvertGameToJson" {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     var arena = std.heap.ArenaAllocator.init(gpa.allocator());
+    defer arena.deinit();
     const allocator = arena.allocator();
-    const game = try Game.init(
+    var game = try Game.init(
         allocator,
         Game.MazeOptions{ .height = 10, .width = 10 },
         null,
         &.{try ItemLib.Bomb.newItem(allocator)},
     );
+    try game.setHorizontalWall(.{ 1, 1 }, .BorderWall);
     try expect(game.item_list.len == 1);
     try expect(std.mem.eql(u8, game.item_list[0].name, "Bomb"));
-    const game_json = try game.getGameJSON();
-    const new_game = try game_json.getGame(allocator);
+    const game_json = try getJSONFromGame(game, allocator);
+    const new_game = try getGameFromJSON(game_json, allocator);
     try expect(new_game.board.height == 10);
     try expect(new_game.board.width == 10);
+    try expect(try new_game.board.getHorizontalWall(.{ 1, 1 }) == WallType.BorderWall);
+    try expect(try new_game.check() == .Valid);
 }

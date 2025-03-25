@@ -14,10 +14,11 @@ const PORT_HTTP: u16 = 8081;
 const MAX_BYTES: usize = (1 << 16);
 
 fn matchClients(client_1: Connection, client_2: Connection) !void {
+    defer client_1.stream.close();
+    defer client_2.stream.close();
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    var aa = std.heap.ArenaAllocator.init(gpa.allocator());
+    const allocator = gpa.allocator();
 
-    const allocator = aa.allocator();
     var series = try GameServer.Series.init(allocator, client_1, client_2);
     try series.start();
 }
@@ -34,6 +35,7 @@ fn runGameServer(server: *std.net.Server) !void {
             const client_2 = connection;
             const match_thread = try std.Thread.spawn(.{}, matchClients, .{ client_1, client_2 });
             match_thread.detach();
+            queue = null;
         } else {
             queue = connection;
         }
