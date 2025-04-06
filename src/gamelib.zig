@@ -139,6 +139,7 @@ pub const MazeBoard = struct {
         return getArr2d(i32, mazeboard.buffer_board, position);
     }
 };
+
 pub const Game = struct {
     board: MazeBoard,
     position: Vec2,
@@ -181,6 +182,19 @@ pub const Game = struct {
         }
         game.position = position;
     }
+    /// Get wall type in the direction relative to the position
+    pub fn getWallRelTile(game: Game, position: Vec2, direction: Direction) WallType {
+        const next_position = position + direction.getVec2();
+        return switch (direction) {
+            .Up => game.board.getHorizontalWall(position) catch unreachable,
+            .Down => game.board.getHorizontalWall(next_position) catch unreachable,
+            .Left => game.board.getVerticalWall(position) catch unreachable,
+            .Right => game.board.getVerticalWall(next_position) catch unreachable,
+        };
+    }
+    pub fn isMoveValid(game: Game, direction: Direction) bool {
+        return game.getWallRelTile(game.current_position, direction).isWall() == false;
+    }
     pub fn move(game: *Game, direction: Direction) !void {
         try game.setPosition(game.position + direction.getVec2());
     }
@@ -212,13 +226,8 @@ pub const Game = struct {
             const current_value = game.board.getBufferValue(current_position) catch unreachable;
             for (Direction.list) |direction| {
                 const next_position = current_position + direction.getVec2();
-                const wall = switch (direction) {
-                    .Up => game.board.getHorizontalWall(current_position) catch unreachable,
-                    .Down => game.board.getHorizontalWall(next_position) catch unreachable,
-                    .Left => game.board.getVerticalWall(current_position) catch unreachable,
-                    .Right => game.board.getVerticalWall(next_position) catch unreachable,
-                };
-                if (WallType.isWall(wall)) {
+                const wall = game.getWallRelTile(current_position, direction);
+                if (wall.isWall()) {
                     continue;
                 }
                 if (!game.board.checkInbound(next_position)) {

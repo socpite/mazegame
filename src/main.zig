@@ -54,14 +54,17 @@ fn runHttpServer(server: *std.net.Server) !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
     const dir = try cwd.openDir("src", .{ .iterate = true });
-    var shfs = try StaticHttpFileServer.init(.{ .allocator = allocator, .root_dir = dir });
-    defer shfs.deinit(allocator);
     while (true) {
+        var shfs = try StaticHttpFileServer.init(.{ .allocator = allocator, .root_dir = dir });
+        defer shfs.deinit(allocator);
         const connection = try server.accept();
         defer connection.stream.close();
         var buffer: [(1 << 16)]u8 = undefined;
         var http_server = std.http.Server.init(connection, buffer[0..]);
-        var request = try http_server.receiveHead();
+        var request = http_server.receiveHead() catch |err| {
+            std.debug.print("Error receiving request: {}\n", .{err});
+            continue;
+        };
         std.debug.print("{s}\n", .{request.head.target});
         var headers = request.iterateHeaders();
         std.debug.print("START\n", .{});
