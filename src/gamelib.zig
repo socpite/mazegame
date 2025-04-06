@@ -48,6 +48,14 @@ fn setArr2d(comptime T: type, arr: [][]T, value: T, position: Vec2) !void {
     arr[@intCast(position[0])][@intCast(position[1])] = value;
 }
 
+fn setAllArr2d(comptime T: type, arr: [][]T, value: T) void {
+    for (arr) |*rows| {
+        for (rows.*) |*cell| {
+            cell.* = value;
+        }
+    }
+}
+
 fn getArr2d(comptime T: type, arr: [][]T, position: Vec2) !T {
     if (!checkInboundArr2d(T, arr, position)) {
         return error.OutOfBound;
@@ -137,6 +145,81 @@ pub const MazeBoard = struct {
     }
     pub fn getBufferValue(mazeboard: MazeBoard, position: Vec2) !i32 {
         return getArr2d(i32, mazeboard.buffer_board, position);
+    }
+
+    pub fn limitVision(mazeboard: MazeBoard, position: Vec2) void {
+        var is_visible = true;
+        const px: usize = @intCast(position[0]);
+        const py: usize = @intCast(position[1]);
+        for (0..px) |x| {
+            const rowid = px - x - 1;
+            if (!is_visible) {
+                mazeboard.horizontal_walls[rowid + 1][py] = .NotVisivle;
+            }
+            if (mazeboard.horizontal_walls[rowid + 1][py].isWall()) {
+                is_visible = false;
+            }
+            for (mazeboard.vertical_walls[rowid], 0..) |*wall, y| {
+                if (wall.* == .BorderWall) {
+                    continue;
+                }
+                if (!is_visible or (y != py and y != py + 1)) {
+                    wall.* = .NotVisivle;
+                }
+            }
+        }
+        is_visible = true;
+        for (px + 1..mazeboard.height) |rowid| {
+            if (!is_visible) {
+                mazeboard.horizontal_walls[rowid][py] = .NotVisivle;
+            }
+            if (mazeboard.horizontal_walls[rowid][py].isWall()) {
+                is_visible = false;
+            }
+            for (mazeboard.vertical_walls[rowid], 0..) |*wall, y| {
+                if (wall.* == .BorderWall) {
+                    continue;
+                }
+                if (!is_visible or (y != py and y != py + 1)) {
+                    wall.* = .NotVisivle;
+                }
+            }
+        }
+        is_visible = true;
+        for (0..py) |y| {
+            const colid = py - y - 1;
+            if (!is_visible) {
+                mazeboard.vertical_walls[px][colid + 1] = .NotVisivle;
+            }
+            if (mazeboard.vertical_walls[px][colid + 1].isWall()) {
+                is_visible = false;
+            }
+            for (mazeboard.horizontal_walls, 0..) |*wall, x| {
+                if (wall.* == .BorderWall) {
+                    continue;
+                }
+                if (!is_visible or (x != px and x != px + 1)) {
+                    wall.* = .NotVisivle;
+                }
+            }
+        }
+        is_visible = true;
+        for (py + 1..mazeboard.width) |colid| {
+            if (!is_visible) {
+                mazeboard.vertical_walls[px][colid] = .NotVisivle;
+            }
+            if (mazeboard.vertical_walls[px][colid].isWall()) {
+                is_visible = false;
+            }
+            for (mazeboard.horizontal_walls, 0..) |*wall, x| {
+                if (wall.* == .BorderWall) {
+                    continue;
+                }
+                if (!is_visible or (x != px and x != px + 1)) {
+                    wall.* = .NotVisivle;
+                }
+            }
+        }
     }
 };
 
@@ -286,6 +369,19 @@ pub const GameJSON = struct {
     position: Vec2,
     item_list: [][]u8,
 };
+
+/// Caller owns the game
+pub fn getGameWithRealVision(
+    game: Game,
+    allocator: std.mem.Allocator,
+) !Game {
+    const new_game = try Game.init(
+        allocator,
+        .{ .board = game.board },
+        game.position,
+        game.item_list,
+    );
+}
 
 pub const Item = struct {
     ptr: *anyopaque,
