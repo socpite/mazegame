@@ -49,12 +49,23 @@ const Match = struct {
             arena_allocator,
             GameLib.GameJSON,
         );
-        self.game = try GameLib.getGameFromJSON(json_game_received, self.allocator);
-        const check_result = try self.game.check();
+        var new_game = try GameLib.getGameFromJSON(
+            json_game_received,
+            arena_allocator,
+        );
+        if (new_game.board.width != self.game.board.width or
+            new_game.board.height != self.game.board.height)
+        {
+            std.debug.print("Invalid maze size\n", .{});
+            return MatchError.InvalidMaze;
+        }
+        const check_result = try self.game.checkEligible(new_game, .{});
         if (check_result != .Valid) {
             std.debug.print("Maze check failed with status: {}\n", .{check_result});
             return MatchError.InvalidMaze;
         }
+        // This ensures that board is still owned by the game arena allocator
+        self.game.board = try new_game.board.deepCopy(self.game.arena.allocator());
     }
     pub fn init(allocator: std.mem.Allocator, mazer_client: *Client, gamer_client: *Client) !Match {
         return Match{
@@ -64,18 +75,52 @@ const Match = struct {
             .game = try GameLib.Game.init(
                 allocator,
                 .{},
-                GameLib.Vec2{ 0, 0 },
+                null,
+                null,
                 try Items.genItemList(&.{"Bomb"}, allocator),
             ),
         };
     }
     fn start(self: *Match) !void {
-        var result = MatchResult.MazerWin;
         self.requestMaze() catch |err| {
             std.debug.print("Request maze failed: {}\n", .{err});
-            result = MatchResult.GamerWin;
+            return self.messageFinished(MatchResult.GamerWin);
         };
-        return self.messageFinished(result);
+        for (0..100) |_| {
+            if (self.game.isFinished()) {
+                try self.gamer_client.writeMessage("Game finished");
+                try self.mazer_client.writeMessage("Game finished");
+                return self.messageFinished(MatchResult.GamerWin);
+            }
+            var limited_vision_game = try GameLib.getGameWithLimitedVision(
+                self.game,
+                self.allocator,
+            );
+            defer limited_vision_game.deinit();
+            try self.gamer_client.writeMessage(Client.REQUEST_MOVE_PROTOCOL);
+            try self.gamer_client.writeJSON(try GameLib.getJSONFromGame(
+                limited_vision_game,
+                self.allocator,
+            ));
+            const move_recieved = self.gamer_client.readJSON(
+                self.allocator,
+                GameLib.Direction,
+            ) catch |err| {
+                std.debug.print("Read move failed: {}\n", .{err});
+                return self.messageFinished(MatchResult.MazerWin);
+            };
+            self.game.move(move_recieved) catch |err| {
+                std.debug.print("Move failed: {}\n", .{err});
+                return self.messageFinished(MatchResult.MazerWin);
+            };
+        }
+        try self.gamer_client.writeMessage("Game finished");
+        try self.mazer_client.writeMessage("Game finished");
+        if (self.game.isFinished()) {
+            return self.messageFinished(MatchResult.GamerWin);
+        } else {
+            return self.messageFinished(MatchResult.MazerWin);
+        }
     }
     fn deinit(self: *Match) void {
         self.game.deinit();

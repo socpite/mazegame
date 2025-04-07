@@ -3,6 +3,7 @@ const Connection = std.net.Server.Connection;
 
 pub const Client = struct {
     pub const REQUEST_MAZE_PROTOCOL = "Request maze";
+    pub const REQUEST_MOVE_PROTOCOL = "Request move";
     const MAX_MESSAGE_LENGTH = 1 << 16;
     stream: std.net.Stream,
     score: u32 = 0,

@@ -1,231 +1,34 @@
 const std = @import("std");
 const ItemLib = @import("item.zig");
 const Queue = @import("queue.zig").Queue;
-pub const Vec2 = @Vector(2, isize);
 const expect = std.testing.expect;
+const Utils = @import("utils.zig");
+const MazeBoard = @import("mazeboard.zig").MazeBoard;
+pub const WallType = Utils.WallType;
+pub const Vec2 = Utils.Vec2;
+pub const Direction = Utils.Direction;
 
-const Direction = enum {
-    Up,
-    Down,
-    Left,
-    Right,
-    const list = [_]Direction{ Direction.Up, Direction.Down, Direction.Left, Direction.Right };
-    fn getVec2(direction: Direction) Vec2 {
-        return switch (direction) {
-            Direction.Up => Vec2{ -1, 0 },
-            Direction.Down => Vec2{ 1, 0 },
-            Direction.Left => Vec2{ 0, -1 },
-            Direction.Right => Vec2{ 0, 1 },
-        };
-    }
-};
-pub const WallType = enum {
-    VisibleWall,
-    NoWall,
-    NotVisivle,
-    LuminatedWall,
-    BorderWall,
-
-    pub fn isWall(wall: WallType) bool {
-        return switch (wall) {
-            WallType.VisibleWall => true,
-            WallType.NoWall => false,
-            WallType.NotVisivle => false,
-            WallType.LuminatedWall => true,
-            WallType.BorderWall => true,
-        };
-    }
+const GameRule = struct {
+    item_min_count: usize = 0,
+    predetermined_item_position: bool = false,
 };
 
-fn checkInboundArr2d(comptime T: type, arr: [][]T, position: Vec2) bool {
-    return 0 <= position[0] and position[0] < arr.len and 0 <= position[1] and position[1] < arr[0].len;
-}
-
-fn setArr2d(comptime T: type, arr: [][]T, value: T, position: Vec2) !void {
-    if (!checkInboundArr2d(T, arr, position)) {
-        return error.OutOfBound;
-    }
-    arr[@intCast(position[0])][@intCast(position[1])] = value;
-}
-
-fn setAllArr2d(comptime T: type, arr: [][]T, value: T) void {
-    for (arr) |*rows| {
-        for (rows.*) |*cell| {
-            cell.* = value;
-        }
-    }
-}
-
-fn getArr2d(comptime T: type, arr: [][]T, position: Vec2) !T {
-    if (!checkInboundArr2d(T, arr, position)) {
-        return error.OutOfBound;
-    }
-    return arr[@intCast(position[0])][@intCast(position[1])];
-}
-
-pub const MazeBoard = struct {
-    height: usize,
-    width: usize,
-    vertical_walls: [][]WallType,
-    horizontal_walls: [][]WallType,
-    buffer_board: [][]i32,
-    item_board: [][]?[]const u8,
-    /// Default maze has border wall only
-    pub fn init(arena: std.mem.Allocator, height: usize, width: usize) !MazeBoard {
-        const vertical_walls = try arena.alloc([]WallType, height);
-        for (vertical_walls) |*rows| {
-            rows.* = try arena.alloc(WallType, width + 1);
-            @memset(rows.*, WallType.NoWall);
-            rows.*[0] = WallType.BorderWall;
-            rows.*[width] = WallType.BorderWall;
-        }
-
-        const horizontal_walls = try arena.alloc([]WallType, height + 1);
-        for (horizontal_walls) |*rows| {
-            rows.* = try arena.alloc(WallType, width);
-            @memset(rows.*, WallType.NoWall);
-        }
-        @memset(horizontal_walls[0], WallType.BorderWall);
-        @memset(horizontal_walls[height], WallType.BorderWall);
-
-        const buffer_board = try arena.alloc([]i32, height);
-        for (buffer_board) |*rows| {
-            rows.* = try arena.alloc(i32, width);
-            @memset(rows.*, 0);
-        }
-
-        const item_board = try arena.alloc([]?[]const u8, height);
-        for (item_board) |*rows| {
-            rows.* = try arena.alloc(?[]const u8, width);
-            @memset(rows.*, null);
-        }
-
-        return MazeBoard{
-            .height = height,
-            .width = width,
-            .vertical_walls = vertical_walls,
-            .horizontal_walls = horizontal_walls,
-            .buffer_board = buffer_board,
-            .item_board = item_board,
-        };
-    }
-
-    pub fn checkInbound(mazeboard: MazeBoard, position: Vec2) bool {
-        return checkInboundArr2d(i32, mazeboard.buffer_board, position);
-    }
-    pub fn checkInboundVerticalWall(mazeboard: MazeBoard, position: Vec2) bool {
-        return checkInboundArr2d(WallType, mazeboard.vertical_walls, position);
-    }
-    pub fn checkInboundHorizontalWall(mazeboard: MazeBoard, position: Vec2) bool {
-        return checkInboundArr2d(WallType, mazeboard.horizontal_walls, position);
-    }
-
-    fn setAllBuffer(mazeboard: MazeBoard, value: i32) void {
-        for (mazeboard.buffer_board) |*rows| {
-            for (rows.*) |*cell| {
-                cell.* = value;
-            }
-        }
-    }
-
-    pub fn setVerticalWall(mazeboard: MazeBoard, position: Vec2, wall_value: WallType) !void {
-        return setArr2d(WallType, mazeboard.vertical_walls, wall_value, position);
-    }
-    pub fn getVerticalWall(mazeboard: MazeBoard, position: Vec2) !WallType {
-        return getArr2d(WallType, mazeboard.vertical_walls, position);
-    }
-    pub fn setHorizontalWall(mazeboard: MazeBoard, position: Vec2, wall_value: WallType) !void {
-        return setArr2d(WallType, mazeboard.horizontal_walls, wall_value, position);
-    }
-    pub fn getHorizontalWall(mazeboard: MazeBoard, position: Vec2) !WallType {
-        return getArr2d(WallType, mazeboard.horizontal_walls, position);
-    }
-    pub fn setBufferValue(mazeboard: MazeBoard, position: Vec2, value: i32) !void {
-        return setArr2d(i32, mazeboard.buffer_board, value, position);
-    }
-    pub fn getBufferValue(mazeboard: MazeBoard, position: Vec2) !i32 {
-        return getArr2d(i32, mazeboard.buffer_board, position);
-    }
-
-    pub fn limitVision(mazeboard: MazeBoard, position: Vec2) void {
-        var is_visible = true;
-        const px: usize = @intCast(position[0]);
-        const py: usize = @intCast(position[1]);
-        for (0..px) |x| {
-            const rowid = px - x - 1;
-            if (!is_visible) {
-                mazeboard.horizontal_walls[rowid + 1][py] = .NotVisivle;
-            }
-            if (mazeboard.horizontal_walls[rowid + 1][py].isWall()) {
-                is_visible = false;
-            }
-            for (mazeboard.vertical_walls[rowid], 0..) |*wall, y| {
-                if (wall.* == .BorderWall) {
-                    continue;
-                }
-                if (!is_visible or (y != py and y != py + 1)) {
-                    wall.* = .NotVisivle;
-                }
-            }
-        }
-        is_visible = true;
-        for (px + 1..mazeboard.height) |rowid| {
-            if (!is_visible) {
-                mazeboard.horizontal_walls[rowid][py] = .NotVisivle;
-            }
-            if (mazeboard.horizontal_walls[rowid][py].isWall()) {
-                is_visible = false;
-            }
-            for (mazeboard.vertical_walls[rowid], 0..) |*wall, y| {
-                if (wall.* == .BorderWall) {
-                    continue;
-                }
-                if (!is_visible or (y != py and y != py + 1)) {
-                    wall.* = .NotVisivle;
-                }
-            }
-        }
-        is_visible = true;
-        for (0..py) |y| {
-            const colid = py - y - 1;
-            if (!is_visible) {
-                mazeboard.vertical_walls[px][colid + 1] = .NotVisivle;
-            }
-            if (mazeboard.vertical_walls[px][colid + 1].isWall()) {
-                is_visible = false;
-            }
-            for (mazeboard.horizontal_walls, 0..) |*wall, x| {
-                if (wall.* == .BorderWall) {
-                    continue;
-                }
-                if (!is_visible or (x != px and x != px + 1)) {
-                    wall.* = .NotVisivle;
-                }
-            }
-        }
-        is_visible = true;
-        for (py + 1..mazeboard.width) |colid| {
-            if (!is_visible) {
-                mazeboard.vertical_walls[px][colid] = .NotVisivle;
-            }
-            if (mazeboard.vertical_walls[px][colid].isWall()) {
-                is_visible = false;
-            }
-            for (mazeboard.horizontal_walls, 0..) |*wall, x| {
-                if (wall.* == .BorderWall) {
-                    continue;
-                }
-                if (!is_visible or (x != px and x != px + 1)) {
-                    wall.* = .NotVisivle;
-                }
-            }
-        }
-    }
+const CheckStatus = enum {
+    Valid,
+    CanGoOutside,
+    NotConnected,
+    StartPositionOutOfBound,
+    EndPositionOutOfBound,
+    InvalidSize,
+    ItemNotFound,
+    InvalidItem,
+    NotEnoughItem,
 };
 
 pub const Game = struct {
     board: MazeBoard,
     position: Vec2,
+    end_position: Vec2,
     item_list: []Item,
     arena: std.heap.ArenaAllocator,
     allocator: std.mem.Allocator,
@@ -235,29 +38,44 @@ pub const Game = struct {
         width: usize = 10,
         board: ?MazeBoard = null,
     };
-    /// item_list is copied
+    /// item_list and board is copied
     pub fn init(
         allocator: std.mem.Allocator,
         maze_options: MazeOptions,
         start_position: ?Vec2,
+        end_position: ?Vec2,
         item_list: []const Item,
     ) !Game {
-        const new_board = maze_options.board orelse try MazeBoard.init(
-            allocator,
-            maze_options.height,
-            maze_options.width,
-        );
-        const new_position = start_position orelse Vec2{ 0, 0 };
-        if (!new_board.checkInbound(new_position)) {
-            return error.StartPositionOutOfBound;
-        }
-        return Game{
-            .arena = std.heap.ArenaAllocator.init(allocator),
+        var arena = std.heap.ArenaAllocator.init(allocator);
+        const temp_allocator = arena.allocator();
+        const new_board = blk: {
+            if (maze_options.board) |board| {
+                break :blk try board.deepCopy(temp_allocator);
+            }
+            break :blk try MazeBoard.init(
+                temp_allocator,
+                maze_options.height,
+                maze_options.width,
+            );
+        };
+        const new_game = Game{
+            .arena = arena,
             .allocator = allocator,
             .board = new_board,
-            .position = new_position,
+            .position = start_position orelse Vec2{ 0, 0 },
+            .end_position = end_position orelse Vec2{
+                @intCast(new_board.height - 1),
+                @intCast(new_board.width - 1),
+            },
             .item_list = try allocator.dupe(Item, item_list),
         };
+        if (!new_game.board.checkInbound(new_game.position)) {
+            return error.StartPositionOutOfBound;
+        }
+        if (!new_game.board.checkInbound(new_game.end_position)) {
+            return error.EndPositionOutOfBound;
+        }
+        return new_game;
     }
     pub fn setPosition(game: *Game, position: Vec2) !void {
         if (!game.board.checkInbound(position)) {
@@ -276,9 +94,12 @@ pub const Game = struct {
         };
     }
     pub fn isMoveValid(game: Game, direction: Direction) bool {
-        return game.getWallRelTile(game.current_position, direction).isWall() == false;
+        return game.getWallRelTile(game.position, direction).isWall() == false;
     }
     pub fn move(game: *Game, direction: Direction) !void {
+        if (!game.isMoveValid(direction)) {
+            return error.InvalidMove;
+        }
         try game.setPosition(game.position + direction.getVec2());
     }
     pub fn setVerticalWall(game: *Game, position: Vec2, wall_value: WallType) !void {
@@ -287,12 +108,6 @@ pub const Game = struct {
     pub fn setHorizontalWall(game: *Game, position: Vec2, wall_value: WallType) !void {
         try game.board.setHorizontalWall(position, wall_value);
     }
-
-    const CheckStatus = enum {
-        Valid,
-        CanGoOutside,
-        NotConnected,
-    };
     /// All border must be wall
     /// All tiles should be connected
     pub fn check(game: Game) error{OutOfMemory}!CheckStatus {
@@ -329,7 +144,74 @@ pub const Game = struct {
             return .NotConnected;
         }
     }
-    pub fn deit(self: *Game) void {
+    pub fn isFinished(game: Game) bool {
+        return game.position[0] == game.end_position[0] and game.position[1] == game.end_position[1];
+    }
+    pub fn findItem(game: Game, item_name: []const u8) ?Item {
+        for (game.item_list) |item| {
+            if (std.mem.eql(u8, item.name, item_name)) {
+                return item;
+            }
+        }
+        return null;
+    }
+    pub fn checkEligible(game: Game, edited_game: Game, game_rule: GameRule) !CheckStatus {
+        if (game.board.height != edited_game.board.height or
+            game.board.width != edited_game.board.width)
+        {
+            return .InvalidSize;
+        }
+        if (!edited_game.board.checkConsistentSize()) {
+            return .InvalidSize;
+        }
+        if (edited_game.board.checkInbound(edited_game.position) == false) {
+            return .StartPositionOutOfBound;
+        }
+        if (edited_game.board.checkInbound(edited_game.end_position) == false) {
+            return .EndPositionOutOfBound;
+        }
+        const bfs_check = try edited_game.check();
+        if (bfs_check != .Valid) {
+            return bfs_check;
+        }
+        // check for any item not in item list
+        for (edited_game.board.item_board) |row| {
+            for (row) |item| {
+                if (item) |item_name| {
+                    const item_ptr = game.findItem(item_name);
+                    if (item_ptr == null) {
+                        return .ItemNotFound;
+                    }
+                }
+            }
+        }
+        // check if any item was edited
+        if (game_rule.predetermined_item_position) {
+            for (edited_game.board.item_board, game.board.item_board) |edited_row, row| {
+                for (edited_row, row) |edited_item, item| {
+                    if (!Utils.optionalStrEql(edited_item, item)) {
+                        return .InvalidItem;
+                    }
+                }
+            }
+        }
+        // check if there are enough items
+        for (game.item_list) |item| {
+            var count: usize = 0;
+            for (edited_game.board.item_board) |row| {
+                for (row) |edited_item| {
+                    if (Utils.optionalStrEql(edited_item, item.name)) {
+                        count += 1;
+                    }
+                }
+            }
+            if (count < game_rule.item_min_count) {
+                return .NotEnoughItem;
+            }
+        }
+        return .Valid;
+    }
+    pub fn deinit(self: *Game) void {
         self.arena.deinit();
         self.allocator.free(self.item_list);
     }
@@ -344,6 +226,7 @@ pub fn getJSONFromGame(game: Game, arena: std.mem.Allocator) !GameJSON {
     return GameJSON{
         .board = game.board,
         .position = game.position,
+        .end_position = game.end_position,
         .item_list = item_list,
     };
 }
@@ -361,17 +244,19 @@ pub fn getGameFromJSON(game_json: GameJSON, allocator: std.mem.Allocator) !Game 
         allocator,
         Game.MazeOptions{ .board = game_json.board },
         game_json.position,
+        game_json.end_position,
         item_list,
     );
 }
 pub const GameJSON = struct {
     board: MazeBoard,
     position: Vec2,
+    end_position: Vec2,
     item_list: [][]u8,
 };
 
 /// Caller owns the game
-pub fn getGameWithRealVision(
+pub fn getGameWithLimitedVision(
     game: Game,
     allocator: std.mem.Allocator,
 ) !Game {
@@ -379,8 +264,11 @@ pub fn getGameWithRealVision(
         allocator,
         .{ .board = game.board },
         game.position,
+        game.end_position,
         game.item_list,
     );
+    new_game.board.limitVision(game.position);
+    return new_game;
 }
 
 pub const Item = struct {
@@ -415,6 +303,7 @@ test "ConvertGameToJson" {
         allocator,
         Game.MazeOptions{ .height = 10, .width = 10 },
         null,
+        null,
         &.{try ItemLib.Bomb.newItem(allocator)},
     );
     try game.setHorizontalWall(.{ 1, 1 }, .BorderWall);
@@ -426,4 +315,30 @@ test "ConvertGameToJson" {
     try expect(new_game.board.width == 10);
     try expect(try new_game.board.getHorizontalWall(.{ 1, 1 }) == WallType.BorderWall);
     try expect(try new_game.check() == .Valid);
+}
+
+test "LimitVision" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var arena = std.heap.ArenaAllocator.init(gpa.allocator());
+    defer arena.deinit();
+    const allocator = arena.allocator();
+    var game = try Game.init(
+        allocator,
+        .{ .height = 3, .width = 3 },
+        .{ 1, 1 },
+        null,
+        &.{},
+    );
+    try game.setVerticalWall(.{ 0, 1 }, .VisibleWall);
+    try game.setVerticalWall(.{ 2, 1 }, .VisibleWall);
+    try game.setVerticalWall(.{ 0, 2 }, .VisibleWall);
+    try game.setVerticalWall(.{ 2, 2 }, .VisibleWall);
+    try game.setHorizontalWall(.{ 1, 1 }, .VisibleWall);
+    var limited_vision_game = try getGameWithLimitedVision(game, allocator);
+    try expect(try limited_vision_game.board.getVerticalWall(.{ 0, 1 }) == WallType.NotVisivle);
+    try expect(try limited_vision_game.board.getVerticalWall(.{ 2, 1 }) == WallType.VisibleWall);
+    try expect(try limited_vision_game.board.getHorizontalWall(.{ 1, 1 }) == WallType.VisibleWall);
+    try game.setHorizontalWall(.{ 1, 1 }, .NoWall);
+    limited_vision_game = try getGameWithLimitedVision(game, allocator);
+    try expect(try limited_vision_game.board.getVerticalWall(.{ 0, 1 }) == WallType.VisibleWall);
 }

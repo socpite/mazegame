@@ -1,7 +1,8 @@
 const GameLib = @import("gamelib.zig");
+const Utils = @import("utils.zig");
 const std = @import("std");
-const WallType = GameLib.WallType;
-const Vec2 = GameLib.Vec2;
+const WallType = Utils.WallType;
+const Vec2 = Utils.Vec2;
 const Item = GameLib.Item;
 const Game = GameLib.Game;
 
