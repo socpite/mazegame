@@ -2,10 +2,8 @@ const std = @import("std");
 
 const StaticHttpFileServer = @import("StaticHttpFileServer");
 const Connection = std.net.Server.Connection;
-const Items = @import("item.zig");
 const Net = std.net;
 const Posix = std.posix;
-const GameLib = @import("gamelib.zig");
 const GameServer = @import("gameserver.zig");
 
 const cwd = std.fs.cwd();
@@ -43,17 +41,9 @@ fn runGameServer(server: *std.net.Server) !void {
 }
 
 fn runHttpServer(server: *std.net.Server) !void {
-    const html_file = std.fs.cwd().openFile(
-        "src/index.html",
-        .{ .mode = .read_only },
-    ) catch |err| {
-        std.debug.print("Error opening html file: {}\n", .{err});
-        return err;
-    };
-    defer html_file.close();
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
-    const dir = try cwd.openDir("src", .{ .iterate = true });
+    const dir = try cwd.openDir("src/server", .{ .iterate = true });
     while (true) {
         var shfs = try StaticHttpFileServer.init(.{ .allocator = allocator, .root_dir = dir });
         defer shfs.deinit(allocator);

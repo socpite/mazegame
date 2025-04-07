@@ -1,12 +1,14 @@
 const std = @import("std");
-const ItemLib = @import("item.zig");
 const Queue = @import("queue.zig").Queue;
 const expect = std.testing.expect;
-const Utils = @import("utils.zig");
-const MazeBoard = @import("mazeboard.zig").MazeBoard;
+
+pub const ItemLib = @import("item.zig");
+pub const MazeBoard = @import("mazeboard.zig").MazeBoard;
+pub const Utils = @import("utils.zig");
 pub const WallType = Utils.WallType;
 pub const Vec2 = Utils.Vec2;
 pub const Direction = Utils.Direction;
+pub const Client = @import("netclient.zig").Client;
 
 const GameRule = struct {
     item_min_count: usize = 0,

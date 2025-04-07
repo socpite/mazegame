@@ -1,7 +1,7 @@
 const std = @import("std");
 const Net = std.net;
-const GameLib = @import("gamelib.zig");
-const Client = @import("netclient.zig").Client;
+const GameLib = @import("gamelib");
+const Client = GameLib.Client;
 
 pub fn main() !void {
     std.debug.print("Starting client\n", .{});

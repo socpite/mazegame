@@ -1,9 +1,9 @@
 const std = @import("std");
-const GameLib = @import("gamelib.zig");
-const Items = @import("item.zig");
+const GameLib = @import("gamelib");
+const Items = GameLib.ItemLib;
 const Self = @This();
 const Connection = std.net.Server.Connection;
-const Client = @import("netclient.zig").Client;
+const Client = GameLib.Client;
 
 const Match = struct {
     game: GameLib.Game,

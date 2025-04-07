@@ -15,28 +15,19 @@ pub fn build(b: *std.Build) void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
-    const lib = b.addStaticLibrary(.{
-        .name = "mazegame",
-        // In this case the main source file is merely a path, however, in more
-        // complicated build scripts, this could be a generated file.
-        .root_source_file = b.path("src/root.zig"),
+    const check = b.step("check", "Check if foo compiles");
+
+    const gamelib_module = b.addModule("mazegame", .{
+        .root_source_file = b.path("src/gamelib/gamelib.zig"),
         .target = target,
         .optimize = optimize,
     });
-
-    // This declares intent for the library to be installed into the standard
-    // location when the user invokes the "install" step (the default step when
-    // running `zig build`).
-    b.installArtifact(lib);
-
-    const check = b.step("check", "Check if foo compiles");
-
     //----------------------------------------------------------------------
     // Server
     // ---------------------------------------------------------------------
 
     const server_module = b.addModule("mazegame", .{
-        .root_source_file = b.path("src/main.zig"),
+        .root_source_file = b.path("src/server/main.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -51,6 +42,7 @@ pub fn build(b: *std.Build) void {
     });
     const file_server_module = file_server.module("StaticHttpFileServer");
     server.root_module.addImport("StaticHttpFileServer", file_server_module);
+    server.root_module.addImport("gamelib", gamelib_module);
     b.installArtifact(server);
 
     const server_run_exe = b.addRunArtifact(server);
@@ -75,7 +67,7 @@ pub fn build(b: *std.Build) void {
     // ---------------------------------------------------------------------
 
     const client_module = b.addModule("mazegame", .{
-        .root_source_file = b.path("src/client.zig"),
+        .root_source_file = b.path("src/client/client.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -83,6 +75,7 @@ pub fn build(b: *std.Build) void {
         .name = "client",
         .root_module = client_module,
     });
+    client.root_module.addImport("gamelib", gamelib_module);
     b.installArtifact(client);
     const client_run_exe = b.addRunArtifact(client);
     client_run_exe.step.dependOn(b.getInstallStep());
@@ -101,16 +94,8 @@ pub fn build(b: *std.Build) void {
     run_client_step.dependOn(&client_run_exe.step);
     // Creates a step for unit testing. This only builds the test executable
     // but does not run it.
-    const lib_unit_tests = b.addTest(.{
-        .root_source_file = b.path("src/root.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-
-    const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
-
     const exe_unit_tests = b.addTest(.{
-        .root_source_file = b.path("src/main.zig"),
+        .root_source_file = b.path("src/server/main.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -121,6 +106,5 @@ pub fn build(b: *std.Build) void {
     // the `zig build --help` menu, providing a way for the user to request
     // running the unit tests.
     const test_step = b.step("test", "Run unit tests");
-    test_step.dependOn(&run_lib_unit_tests.step);
     test_step.dependOn(&run_exe_unit_tests.step);
 }
