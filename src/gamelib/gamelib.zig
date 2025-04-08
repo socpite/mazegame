@@ -9,23 +9,7 @@ pub const WallType = Utils.WallType;
 pub const Vec2 = Utils.Vec2;
 pub const Direction = Utils.Direction;
 pub const Client = @import("netclient.zig").Client;
-
-const GameRule = struct {
-    item_min_count: usize = 0,
-    predetermined_item_position: bool = false,
-};
-
-const CheckStatus = enum {
-    Valid,
-    CanGoOutside,
-    NotConnected,
-    StartPositionOutOfBound,
-    EndPositionOutOfBound,
-    InvalidSize,
-    ItemNotFound,
-    InvalidItem,
-    NotEnoughItem,
-};
+pub const Checker = @import("checker.zig");
 
 pub const Game = struct {
     board: MazeBoard,
@@ -112,40 +96,6 @@ pub const Game = struct {
     }
     /// All border must be wall
     /// All tiles should be connected
-    pub fn check(game: Game) error{OutOfMemory}!CheckStatus {
-        var queue = try Queue(Vec2).init(
-            game.allocator,
-            game.board.height * game.board.width,
-        );
-        defer queue.deinit();
-        game.board.setAllBuffer(-1);
-        queue.push(game.position) catch unreachable;
-        game.board.setBufferValue(game.position, 0) catch unreachable;
-        while (queue.front < queue.back) {
-            const current_position = queue.pop() catch unreachable;
-            const current_value = game.board.getBufferValue(current_position) catch unreachable;
-            for (Direction.list) |direction| {
-                const next_position = current_position + direction.getVec2();
-                const wall = game.getWallRelTile(current_position, direction);
-                if (wall.isWall()) {
-                    continue;
-                }
-                if (!game.board.checkInbound(next_position)) {
-                    return .CanGoOutside;
-                }
-                if (game.board.getBufferValue(next_position) catch unreachable != -1) {
-                    continue;
-                }
-                game.board.setBufferValue(next_position, current_value + 1) catch unreachable;
-                queue.push(next_position) catch unreachable;
-            }
-        }
-        if (queue.back == game.board.height * game.board.width) {
-            return .Valid;
-        } else {
-            return .NotConnected;
-        }
-    }
     pub fn isFinished(game: Game) bool {
         return game.position[0] == game.end_position[0] and game.position[1] == game.end_position[1];
     }
@@ -156,62 +106,6 @@ pub const Game = struct {
             }
         }
         return null;
-    }
-    pub fn checkEligible(game: Game, edited_game: Game, game_rule: GameRule) !CheckStatus {
-        if (game.board.height != edited_game.board.height or
-            game.board.width != edited_game.board.width)
-        {
-            return .InvalidSize;
-        }
-        if (!edited_game.board.checkConsistentSize()) {
-            return .InvalidSize;
-        }
-        if (edited_game.board.checkInbound(edited_game.position) == false) {
-            return .StartPositionOutOfBound;
-        }
-        if (edited_game.board.checkInbound(edited_game.end_position) == false) {
-            return .EndPositionOutOfBound;
-        }
-        const bfs_check = try edited_game.check();
-        if (bfs_check != .Valid) {
-            return bfs_check;
-        }
-        // check for any item not in item list
-        for (edited_game.board.item_board) |row| {
-            for (row) |item| {
-                if (item) |item_name| {
-                    const item_ptr = game.findItem(item_name);
-                    if (item_ptr == null) {
-                        return .ItemNotFound;
-                    }
-                }
-            }
-        }
-        // check if any item was edited
-        if (game_rule.predetermined_item_position) {
-            for (edited_game.board.item_board, game.board.item_board) |edited_row, row| {
-                for (edited_row, row) |edited_item, item| {
-                    if (!Utils.optionalStrEql(edited_item, item)) {
-                        return .InvalidItem;
-                    }
-                }
-            }
-        }
-        // check if there are enough items
-        for (game.item_list) |item| {
-            var count: usize = 0;
-            for (edited_game.board.item_board) |row| {
-                for (row) |edited_item| {
-                    if (Utils.optionalStrEql(edited_item, item.name)) {
-                        count += 1;
-                    }
-                }
-            }
-            if (count < game_rule.item_min_count) {
-                return .NotEnoughItem;
-            }
-        }
-        return .Valid;
     }
     pub fn deinit(self: *Game) void {
         self.arena.deinit();

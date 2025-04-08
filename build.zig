@@ -52,6 +52,7 @@ pub fn build(b: *std.Build) void {
         .root_module = server_module,
     });
     server_check.root_module.addImport("StaticHttpFileServer", file_server_module);
+    server_check.root_module.addImport("gamelib", gamelib_module);
     check.dependOn(&server_check.step);
     server_run_exe.step.dependOn(b.getInstallStep());
 
@@ -84,6 +85,7 @@ pub fn build(b: *std.Build) void {
         .name = "mazegame",
         .root_module = client_module,
     });
+    client_check.root_module.addImport("gamelib", gamelib_module);
     check.dependOn(&client_check.step);
 
     if (b.args) |args| {

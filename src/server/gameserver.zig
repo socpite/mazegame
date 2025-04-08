@@ -4,6 +4,7 @@ const Items = GameLib.ItemLib;
 const Self = @This();
 const Connection = std.net.Server.Connection;
 const Client = GameLib.Client;
+const Checker = GameLib.Checker;
 
 const Match = struct {
     game: GameLib.Game,
@@ -59,7 +60,7 @@ const Match = struct {
             std.debug.print("Invalid maze size\n", .{});
             return MatchError.InvalidMaze;
         }
-        const check_result = try self.game.checkEligible(new_game, .{});
+        const check_result = try Checker.checkEligible(self.game, new_game, .{});
         if (check_result != .Valid) {
             std.debug.print("Maze check failed with status: {}\n", .{check_result});
             return MatchError.InvalidMaze;
