@@ -54,7 +54,6 @@ pub fn build(b: *std.Build) void {
     server_check.root_module.addImport("StaticHttpFileServer", file_server_module);
     server_check.root_module.addImport("gamelib", gamelib_module);
     check.dependOn(&server_check.step);
-    server_run_exe.step.dependOn(b.getInstallStep());
 
     if (b.args) |args| {
         server_run_exe.addArgs(args);

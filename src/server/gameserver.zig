@@ -13,6 +13,8 @@ const Match = struct {
     allocator: std.mem.Allocator,
     const MatchError = error{
         InvalidMaze,
+        MazerTimeout,
+        GamerTimeout,
     };
     const MatchResult = enum {
         Error,
@@ -46,9 +48,10 @@ const Match = struct {
             self.game,
             arena_allocator,
         ));
-        const json_game_received = try self.mazer_client.readJSON(
+        const json_game_received = try self.mazer_client.*.getNextJSONTimed(
             arena_allocator,
             GameLib.GameJSON,
+            null,
         );
         var new_game = try GameLib.getGameFromJSON(
             json_game_received,
@@ -103,9 +106,10 @@ const Match = struct {
                 limited_vision_game,
                 self.allocator,
             ));
-            const move_recieved = self.gamer_client.readJSON(
+            const move_recieved = self.gamer_client.*.getNextJSONTimed(
                 self.allocator,
                 GameLib.Direction,
+                null,
             ) catch |err| {
                 std.debug.print("Read move failed: {}\n", .{err});
                 return self.messageFinished(MatchResult.MazerWin);
@@ -135,10 +139,14 @@ pub const Series = struct {
     client_2: Client,
     const ROUND_COUNT = 12;
     pub fn init(allocator: std.mem.Allocator, client_1: Connection, client_2: Connection) !Series {
+        var netclient_1 = Client.init(allocator, client_1.stream, .{});
+        var netclient_2 = Client.init(allocator, client_2.stream, .{});
+        try netclient_1.start();
+        try netclient_2.start();
         return Series{
             .allocator = allocator,
-            .client_1 = Client{ .stream = client_1.stream },
-            .client_2 = Client{ .stream = client_2.stream },
+            .client_1 = netclient_1,
+            .client_2 = netclient_2,
         };
     }
     pub fn start(self: *Series) !void {
