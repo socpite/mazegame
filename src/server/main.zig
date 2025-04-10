@@ -74,7 +74,7 @@ fn runHttpServer(server: *std.net.Server) !void {
 
 pub fn main() !void {
     const addr = try Net.Address.parseIp("127.0.0.1", PORT);
-    const addr_http = try Net.Address.parseIp("192.168.1.230", PORT_HTTP);
+    const addr_http = try Net.Address.parseIp("127.0.0.1", PORT_HTTP);
     var server = try Net.Address.listen(addr, .{ .reuse_address = true });
     var http_server = try Net.Address.listen(addr_http, .{ .reuse_address = true });
     defer server.deinit();

@@ -6,6 +6,9 @@ const Connection = std.net.Server.Connection;
 const Client = GameLib.Client;
 const Checker = GameLib.Checker;
 
+var gpa1 = std.heap.GeneralPurposeAllocator(.{}){};
+var gpa2 = std.heap.GeneralPurposeAllocator(.{}){};
+
 const Match = struct {
     game: GameLib.Game,
     mazer_client: *Client,
@@ -139,20 +142,32 @@ pub const Series = struct {
     client_2: Client,
     const ROUND_COUNT = 12;
     pub fn init(allocator: std.mem.Allocator, client_1: Connection, client_2: Connection) !Series {
-        var netclient_1 = Client.init(allocator, client_1.stream, .{});
-        var netclient_2 = Client.init(allocator, client_2.stream, .{});
-        try netclient_1.start();
-        try netclient_2.start();
-        return Series{
+        var new_series = Series{
             .allocator = allocator,
-            .client_1 = netclient_1,
-            .client_2 = netclient_2,
+            .client_1 = Client.init(
+                allocator,
+                client_1.stream,
+                .{},
+                "mazer",
+            ),
+            .client_2 = Client.init(
+                allocator,
+                client_2.stream,
+                .{},
+                "client",
+            ),
         };
+        try new_series.client_1.start();
+        try new_series.client_2.start();
+        return new_series;
     }
     pub fn start(self: *Series) !void {
+        try self.client_1.writeMessage("Series start");
+        try self.client_2.writeMessage("Series start");
+        std.debug.print("Series started\n", .{});
         for (0..ROUND_COUNT) |_| {
             var match = try Match.init(
-                self.allocator,
+                gpa1.allocator(),
                 &self.client_1,
                 &self.client_2,
             );
@@ -160,7 +175,7 @@ pub const Series = struct {
         }
         for (0..ROUND_COUNT) |_| {
             var match = try Match.init(
-                self.allocator,
+                gpa2.allocator(),
                 &self.client_2,
                 &self.client_1,
             );

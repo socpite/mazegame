@@ -7,7 +7,7 @@ pub const Client = struct {
     pub const REQUEST_MOVE_PROTOCOL = "Request move";
     const StreamOptions = struct {
         max_timeout_ms: u64 = 10000,
-        max_message_length: usize = 1024,
+        max_message_length: usize = 1 << 16,
     };
 
     stream: std.net.Stream,
@@ -17,11 +17,13 @@ pub const Client = struct {
     mutex: std.Thread.Mutex,
     condition: std.Thread.Condition,
     read_position: usize = 0,
+    name: []const u8,
 
     pub fn init(
         allocator: std.mem.Allocator,
         stream: std.net.Stream,
         stream_options: StreamOptions,
+        name: []const u8,
     ) Client {
         return Client{
             .stream = stream,
@@ -29,6 +31,7 @@ pub const Client = struct {
             .stream_options = stream_options,
             .mutex = .{},
             .condition = .{},
+            .name = name,
         };
     }
 
@@ -60,47 +63,68 @@ pub const Client = struct {
         // Notify any waiting threads that a new message has been added
         self.condition.signal();
     }
+    pub fn debugPrint(self: Client, comptime fmt: []const u8, args: anytype) void {
+        std.debug.print("Client: {s}, ", .{self.name});
+        std.debug.print(fmt, args);
+        std.debug.print("\n", .{});
+    }
     fn readLoop(self: *Client) !void {
         while (true) {
             const message = self.readMessage(self.buffer.allocator) catch |err| {
                 if (err == error.EndOfStream) {
-                    std.debug.print("End of stream reached, stopping read loop.\n", .{});
+                    self.debugPrint("End of stream reached, stopping read loop.", .{});
                     return;
                 }
-                std.debug.print("Error reading message: {}\n", .{err});
-                continue;
-            };
-            self.addMessage(message) catch |err| {
-                std.debug.print("Error adding message: {}\n", .{err});
+                self.debugPrint("Error reading message: {}", .{err});
                 return err;
             };
+            self.addMessage(message) catch |err| {
+                self.debugPrint("Error adding message: {}", .{err});
+                return err;
+            };
+            self.buffer.allocator.free(message);
         }
     }
-    pub fn getNextMessage(self: *Client, allocator: std.mem.Allocator) ![]u8 {
-        if (self.read_position < self.buffer.items.len) {
-            const message_end = std.mem.indexOfScalar(u8, self.buffer.items[self.read_position..], '\n') orelse return error.IncompleteMessage;
-            const message = try allocator.dupe(u8, self.buffer.items[self.read_position..message_end]);
-            self.read_position += message.len;
-            return message;
-        }
-        return error.NoMessage;
-    }
-    pub fn getNextMessageTimed(self: *Client, allocator: std.mem.Allocator, timeout_ms: ?u64) ![]u8 {
+    pub fn checkNewMessage(self: *Client) bool {
         self.mutex.lock();
         defer self.mutex.unlock();
-        const ns = (timeout_ms orelse self.stream_options.max_timeout_ms) * std.time.ns_per_ms;
-        if (self.getNextMessage(allocator)) |message| {
-            return message;
-        } else |err| {
-            if (err == error.NoMessage) {
-                self.condition.timedWait(&self.mutex, ns) catch |wait_err| {
-                    std.debug.print("Error waiting for message: {}\n", .{wait_err});
-                    return wait_err;
-                };
-                return self.getNextMessage(allocator);
-            }
-            return err;
+        if (self.read_position < self.buffer.items.len) {
+            return true;
         }
+        return false;
+    }
+    pub fn getNextMessage(self: *Client, allocator: std.mem.Allocator) ![]u8 {
+        self.mutex.lock();
+        defer self.mutex.unlock();
+        if (!self.checkNewMessage()) {
+            return error.NoMessage;
+        }
+        const message_end = std.mem.indexOfScalarPos(
+            u8,
+            self.buffer.items,
+            self.read_position,
+            '\n',
+        ) orelse return error.IncompleteMessage;
+        const message = try allocator.dupe(u8, self.buffer.items[self.read_position..message_end]);
+        self.read_position = message_end + 1;
+        return message;
+    }
+    pub fn getNextMessageTimed(self: *Client, allocator: std.mem.Allocator, timeout_ms: ?u64) ![]u8 {
+        const ns = (timeout_ms orelse self.stream_options.max_timeout_ms) * std.time.ns_per_ms;
+        if (self.checkNewMessage()) {
+            return try self.getNextMessage(allocator);
+        }
+        {
+            self.mutex.lock();
+            defer self.mutex.unlock();
+            self.condition.timedWait(&self.mutex, ns) catch |err| {
+                try std.testing.expectEqual(err, error.Timeout);
+            };
+        }
+        if (self.checkNewMessage()) {
+            return try self.getNextMessage(allocator);
+        }
+        return error.Timeout;
     }
     pub fn getNextJSON(self: *Client, allocator: std.mem.Allocator, comptime T: type) !T {
         const message = try self.getNextMessage(allocator);
