@@ -12,13 +12,12 @@ const PORT_HTTP: u16 = 8081;
 const MAX_BYTES: usize = (1 << 16);
 
 fn matchClients(client_1: Connection, client_2: Connection) !void {
-    defer client_1.stream.close();
-    defer client_2.stream.close();
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
 
     var series = try GameServer.Series.init(allocator, client_1, client_2);
     try series.start();
+    try series.deinit();
 }
 
 fn runGameServer(server: *std.net.Server) !void {

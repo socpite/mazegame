@@ -43,14 +43,14 @@ pub fn main() !void {
                 game_input_json,
                 allocator,
             );
-            for (GameLib.Direction.list) |direction| {
-                if (game_input.isMoveValid(direction)) {
-                    try client.writeJSON(direction);
-                    break;
-                }
+            if (game_input.isMoveValid(.Right)) {
+                try client.writeJSON(GameLib.Direction.Right);
+            } else if (game_input.isMoveValid(.Down)) {
+                try client.writeJSON(GameLib.Direction.Down);
             }
-        } else {
-            std.debug.print("Unknown message: {s}\n", .{message});
+        } else if (std.mem.eql(u8, message, "Series draw")) {
+            try client.deinit();
+            break;
         }
     }
 }

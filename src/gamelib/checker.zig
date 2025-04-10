@@ -138,6 +138,7 @@ pub fn checkEligibleWalls(
                 if (edited_wall != .BorderWall) {
                     return .InvalidWall;
                 }
+                continue;
             }
             if (edited_wall != .VisibleWall and edited_wall != .NoWall) {
                 return .InvalidWall;
@@ -150,6 +151,7 @@ pub fn checkEligibleWalls(
                 if (edited_wall != .BorderWall) {
                     return .InvalidWall;
                 }
+                continue;
             }
             if (edited_wall != .VisibleWall and edited_wall != .NoWall) {
                 return .InvalidWall;
@@ -192,4 +194,28 @@ pub fn checkEligible(game: Game, edited_game: Game, game_rule: GameRule) !CheckS
         return wall_check;
     }
     return .Valid;
+}
+
+test "simpleChecks" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const allocator = gpa.allocator();
+    const game = try Game.init(
+        allocator,
+        .{ .width = 5, .height = 5 },
+        null,
+        null,
+        &.{},
+    );
+    var edited_game = try Game.init(
+        allocator,
+        .{ .width = 5, .height = 5 },
+        null,
+        null,
+        &.{},
+    );
+    edited_game.setHorizontalWall(.{ 1, 1 }, .VisibleWall) catch unreachable;
+    try std.testing.expectEqual(
+        try checkEligible(game, edited_game, .{}),
+        .Valid,
+    );
 }

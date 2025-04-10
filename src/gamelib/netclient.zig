@@ -1,12 +1,12 @@
 const std = @import("std");
 const Connection = std.net.Server.Connection;
-
 /// Remember to call start on the client
 pub const Client = struct {
     pub const REQUEST_MAZE_PROTOCOL = "Request maze";
     pub const REQUEST_MOVE_PROTOCOL = "Request move";
     const StreamOptions = struct {
-        max_timeout_ms: u64 = 10000,
+        // By default, timeout if infinite
+        max_timeout_ms: u64 = std.math.maxInt(u64) / std.time.ns_per_ms,
         max_message_length: usize = 1 << 16,
     };
 
@@ -17,6 +17,7 @@ pub const Client = struct {
     mutex: std.Thread.Mutex,
     condition: std.Thread.Condition,
     read_position: usize = 0,
+    is_closed: bool = false,
     name: []const u8,
 
     pub fn init(
@@ -49,7 +50,11 @@ pub const Client = struct {
         _ = try self.stream.write("\n");
     }
     pub fn readMessage(self: Client, allocator: std.mem.Allocator) ![]u8 {
-        return try self.stream.reader().readUntilDelimiterAlloc(
+        std.time.sleep(std.time.ns_per_ms * 20);
+        if (self.is_closed) {
+            return error.EndOfStream;
+        }
+        return self.stream.reader().readUntilDelimiterAlloc(
             allocator,
             '\n',
             self.stream_options.max_message_length,
@@ -75,7 +80,7 @@ pub const Client = struct {
                     self.debugPrint("End of stream reached, stopping read loop.", .{});
                     return;
                 }
-                self.debugPrint("Error reading message: {}", .{err});
+                self.debugPrint("Unexpected error", .{});
                 return err;
             };
             self.addMessage(message) catch |err| {
@@ -94,11 +99,11 @@ pub const Client = struct {
         return false;
     }
     pub fn getNextMessage(self: *Client, allocator: std.mem.Allocator) ![]u8 {
-        self.mutex.lock();
-        defer self.mutex.unlock();
         if (!self.checkNewMessage()) {
             return error.NoMessage;
         }
+        self.mutex.lock();
+        defer self.mutex.unlock();
         const message_end = std.mem.indexOfScalarPos(
             u8,
             self.buffer.items,
@@ -118,7 +123,7 @@ pub const Client = struct {
             self.mutex.lock();
             defer self.mutex.unlock();
             self.condition.timedWait(&self.mutex, ns) catch |err| {
-                try std.testing.expectEqual(err, error.Timeout);
+                std.debug.assert(err == error.Timeout);
             };
         }
         if (self.checkNewMessage()) {
@@ -144,8 +149,12 @@ pub const Client = struct {
             .{},
         );
     }
-    pub fn close(self: *Client) !void {
-        try self.stream.close();
+    pub fn deinit(self: *Client) !void {
+        try std.posix.shutdown(self.stream.handle, .both);
+        self.debugPrint("Deinitializing client\n", .{});
+        self.is_closed = true;
+        // Wait for the read loop to finish
+        std.time.sleep(std.time.ns_per_ms * 1000);
         self.buffer.deinit();
     }
     pub fn clearBuffer(self: *Client) void {
@@ -165,6 +174,7 @@ test "ReadTimeout" {
         allocator,
         std.net.Stream{ .handle = undefined },
         .{},
+        "TestClient",
     );
     const thread = try std.Thread.spawn(.{}, delay_add, .{ &client, 2000 });
     thread.detach();

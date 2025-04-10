@@ -78,7 +78,6 @@ pub fn build(b: *std.Build) void {
     client.root_module.addImport("gamelib", gamelib_module);
     b.installArtifact(client);
     const client_run_exe = b.addRunArtifact(client);
-    client_run_exe.step.dependOn(b.getInstallStep());
 
     const client_check = b.addExecutable(.{
         .name = "mazegame",

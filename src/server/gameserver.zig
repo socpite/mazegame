@@ -73,6 +73,7 @@ const Match = struct {
         }
         // This ensures that board is still owned by the game arena allocator
         self.game.board = try new_game.board.deepCopy(self.game.arena.allocator());
+        std.debug.print("Maze received\n", .{});
     }
     pub fn init(allocator: std.mem.Allocator, mazer_client: *Client, gamer_client: *Client) !Match {
         return Match{
@@ -89,6 +90,7 @@ const Match = struct {
         };
     }
     fn start(self: *Match) !void {
+        std.debug.print("Match started with {s}\n", .{self.mazer_client.name});
         self.requestMaze() catch |err| {
             std.debug.print("Request maze failed: {}\n", .{err});
             return self.messageFinished(MatchResult.GamerWin);
@@ -138,24 +140,28 @@ const Match = struct {
 /// A series of matches between two clients. Does not need to deinit.
 pub const Series = struct {
     allocator: std.mem.Allocator,
-    client_1: Client,
-    client_2: Client,
+    client_1: *Client,
+    client_2: *Client,
     const ROUND_COUNT = 12;
     pub fn init(allocator: std.mem.Allocator, client_1: Connection, client_2: Connection) !Series {
+        const new_client_1 = try allocator.create(Client);
+        const new_client_2 = try allocator.create(Client);
+        new_client_1.* = Client.init(
+            allocator,
+            client_1.stream,
+            .{},
+            "mazer",
+        );
+        new_client_2.* = Client.init(
+            allocator,
+            client_2.stream,
+            .{},
+            "gamer",
+        );
         var new_series = Series{
             .allocator = allocator,
-            .client_1 = Client.init(
-                allocator,
-                client_1.stream,
-                .{},
-                "mazer",
-            ),
-            .client_2 = Client.init(
-                allocator,
-                client_2.stream,
-                .{},
-                "client",
-            ),
+            .client_1 = new_client_1,
+            .client_2 = new_client_2,
         };
         try new_series.client_1.start();
         try new_series.client_2.start();
@@ -167,17 +173,17 @@ pub const Series = struct {
         std.debug.print("Series started\n", .{});
         for (0..ROUND_COUNT) |_| {
             var match = try Match.init(
-                gpa1.allocator(),
-                &self.client_1,
-                &self.client_2,
+                self.allocator,
+                self.client_1,
+                self.client_2,
             );
             try match.start();
         }
         for (0..ROUND_COUNT) |_| {
             var match = try Match.init(
-                gpa2.allocator(),
-                &self.client_2,
-                &self.client_1,
+                self.allocator,
+                self.client_2,
+                self.client_1,
             );
             try match.start();
         }
@@ -191,5 +197,11 @@ pub const Series = struct {
             try self.client_1.writeMessage("Series draw");
             try self.client_2.writeMessage("Series draw");
         }
+    }
+    pub fn deinit(self: Series) !void {
+        try self.client_1.deinit();
+        try self.client_2.deinit();
+        self.allocator.destroy(self.client_1);
+        self.allocator.destroy(self.client_2);
     }
 };

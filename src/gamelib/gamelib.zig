@@ -202,15 +202,15 @@ test "ConvertGameToJson" {
         null,
         &.{try ItemLib.Bomb.newItem(allocator)},
     );
-    try game.setHorizontalWall(.{ 1, 1 }, .BorderWall);
+    try game.setHorizontalWall(.{ 1, 1 }, .VisibleWall);
     try expect(game.item_list.len == 1);
     try expect(std.mem.eql(u8, game.item_list[0].name, "Bomb"));
     const game_json = try getJSONFromGame(game, allocator);
     const new_game = try getGameFromJSON(game_json, allocator);
     try expect(new_game.board.height == 10);
     try expect(new_game.board.width == 10);
-    try expect(try new_game.board.getHorizontalWall(.{ 1, 1 }) == WallType.BorderWall);
-    try expect(try new_game.check() == .Valid);
+    try expect(try new_game.board.getHorizontalWall(.{ 1, 1 }) == WallType.VisibleWall);
+    try expect(try Checker.checkEligible(game, new_game, .{}) == .Valid);
 }
 
 test "LimitVision" {
