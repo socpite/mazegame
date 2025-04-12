@@ -6,7 +6,7 @@ const Vec2 = GameLib.Vec2;
 const Direction = GameLib.Direction;
 const Utils = GameLib.Utils;
 
-const GameRule = struct {
+pub const GameRule = struct {
     min_item_count: usize = 0,
     predetermined_item_position: bool = false,
 };

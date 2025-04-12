@@ -69,7 +69,6 @@ test "Dynamic linking" {
     set_start_pos = dyn_lib.lookup(@TypeOf(set_start_pos), "set_start_pos").?;
     get_start_pos = dyn_lib.lookup(@TypeOf(get_start_pos), "get_start_pos").?;
     const game = create_game(5, 5);
-    set_start_pos(game, 1, 1);
     const start_pos = get_start_pos(game);
     std.debug.print("Start pos: {d}, {d}\n", .{ start_pos[0], start_pos[1] });
 }

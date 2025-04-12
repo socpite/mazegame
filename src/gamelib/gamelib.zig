@@ -18,6 +18,7 @@ pub const Game = struct {
     item_list: []Item,
     arena: std.heap.ArenaAllocator,
     allocator: std.mem.Allocator,
+    rules: Checker.GameRule = .{},
     /// Default height and width is 10
     const MazeOptions = struct {
         height: usize = 10,
