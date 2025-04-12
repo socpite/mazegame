@@ -75,6 +75,8 @@ pub fn build(b: *std.Build) void {
         .name = "client",
         .root_module = client_module,
     });
+    client.linkLibC();
+    client.linkLibCpp();
     client.root_module.addImport("gamelib", gamelib_module);
     b.installArtifact(client);
     const client_run_exe = b.addRunArtifact(client);
