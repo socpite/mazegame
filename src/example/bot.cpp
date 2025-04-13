@@ -8,8 +8,11 @@ using namespace std;
     * The bot will be given the game state as input and should output the move to make.
 */
 
-// You can use any variables you want   
-int example_variable = 0;
+// You can define any variable or function, but you should wrap them in a namespace to avoid name clashes with the game engine.
+
+namespace example {
+    int example_variable = 0;
+}
 
 // This function should return a game, given an intial game state.
 // game.horizontal_walls is a 2D array of size (n-1) x m, where each element determines if there is a wall between the cell (i, j) and (i+1, j).

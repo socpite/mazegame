@@ -107,11 +107,11 @@ extern "C" {
     }
     const char* get_move_type(GameMove* move) {
         switch (move->type) {
-            case UP: return "UP";
-            case DOWN: return "DOWN";
-            case LEFT: return "LEFT";
-            case RIGHT: return "RIGHT";
-            case ITEM: return "ITEM";
+            case UP: return "Up";
+            case DOWN: return "Down";
+            case LEFT: return "Left";
+            case RIGHT: return "Right";
+            case ITEM: return "Item";
         }
         return "";
     }
@@ -135,6 +135,12 @@ extern "C" {
     }
     const char* get_item(Game* game, int x, int y) {
         return game->item_board[x][y].c_str();
+    }
+    int get_width(Game* game) {
+        return game->m;
+    }
+    int get_height(Game* game) {
+        return game->n;
     }
 
 #ifdef __cplusplus

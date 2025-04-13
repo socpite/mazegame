@@ -31,13 +31,13 @@ pub fn main() !void {
         std.debug.print("Received message: {s}\n", .{message});
         if (std.mem.eql(u8, message, Client.REQUEST_MAZE_PROTOCOL)) {
             const game_input_json = try client.getNextJSONTimed(allocator, GameLib.GameJSON, null);
-            var game_input = try GameLib.getGameFromJSON(
+            const game_input = try GameLib.getGameFromJSON(
                 game_input_json,
                 allocator,
             );
-            try game_input.setHorizontalWall(.{ 1, 1 }, .VisibleWall);
+            const new_game = try PlayerLoader.getGame(allocator, game_input);
             const game_final_json = try GameLib.getJSONFromGame(
-                game_input,
+                new_game,
                 allocator,
             );
             try client.writeJSON(game_final_json);

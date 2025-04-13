@@ -47,11 +47,17 @@ pub const Bomb = struct {
         bomb.* = Bomb{};
         return bomb.asItem();
     }
+    pub fn canApply(ctx: *anyopaque, game: *Game) bool {
+        const self: *Bomb = @ptrCast(@alignCast(ctx));
+        _ = game;
+        return self.count > 0;
+    }
     pub fn asItem(self: *Bomb) Item {
         return Item{
             .ptr = self,
             .name = name,
             .impl = &.{
+                .can_apply = Bomb.canApply,
                 .pick_up = Bomb.pickUp,
                 .apply = Bomb.apply,
                 .json_stringify = Bomb.jsonStringify,

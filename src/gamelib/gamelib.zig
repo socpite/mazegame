@@ -11,6 +11,11 @@ pub const Direction = Utils.Direction;
 pub const Client = @import("netclient.zig").Client;
 pub const Checker = @import("checker.zig");
 
+pub const GameTurn = union(enum) {
+    direction: Direction,
+    item_name: []const u8,
+};
+
 pub const Game = struct {
     board: MazeBoard,
     position: Vec2,
@@ -25,13 +30,14 @@ pub const Game = struct {
         width: usize = 10,
         board: ?MazeBoard = null,
     };
+
     /// item_list and board is copied
     pub fn init(
         allocator: std.mem.Allocator,
         maze_options: MazeOptions,
         start_position: ?Vec2,
         end_position: ?Vec2,
-        item_list: []const Item,
+        item_list: []Item,
     ) !Game {
         var arena = std.heap.ArenaAllocator.init(allocator);
         const temp_allocator = arena.allocator();
@@ -64,12 +70,14 @@ pub const Game = struct {
         }
         return new_game;
     }
+
     pub fn setPosition(game: *Game, position: Vec2) !void {
         if (!game.board.checkInbound(position)) {
             return error.PositionOutOfBound;
         }
         game.position = position;
     }
+
     /// Get wall type in the direction relative to the position
     pub fn getWallRelTile(game: Game, position: Vec2, direction: Direction) WallType {
         const next_position = position + direction.getVec2();
@@ -80,23 +88,69 @@ pub const Game = struct {
             .Right => game.board.getVerticalWall(next_position) catch unreachable,
         };
     }
+
+    pub fn setItem(game: *Game, item_name: []const u8, position: Vec2) !void {
+        if (game.findItem(item_name) == null) {
+            return error.ItemNotFound;
+        }
+        try Utils.setArr2d(
+            ?[]const u8,
+            game.board.item_board,
+            try game.arena.allocator().dupe(u8, item_name),
+            position,
+        );
+    }
+
+    pub fn isItemValid(game: Game, item_name: []const u8) bool {
+        for (game.item_list) |item| {
+            if (std.mem.eql(u8, item.name, item_name)) {
+                return item.canApply(&game);
+            }
+        }
+        return false;
+    }
+
+    pub fn useItem(game: *Game, item_name: []const u8) !void {
+        const item = game.findItem(item_name) orelse return error.ItemNotFound;
+        if (!item.canApply(game)) {
+            return error.ItemNotApplicable;
+        }
+        item.apply(game);
+    }
+
+    pub fn doTurn(game: *Game, turn: GameTurn) !void {
+        switch (turn) {
+            .direction => |move_direction| try game.move(move_direction),
+            .item_name => |item_name| try game.useItem(item_name),
+        }
+    }
+
     pub fn isMoveValid(game: Game, direction: Direction) bool {
         return game.getWallRelTile(game.position, direction).isWall() == false;
     }
+
+    pub fn isTurnValid(game: Game, turn: GameTurn) bool {
+        return switch (turn) {
+            .direction => |move_direction| game.isMoveValid(move_direction),
+            .item_name => |item_name| game.isItemValid(item_name),
+        };
+    }
+
     pub fn move(game: *Game, direction: Direction) !void {
         if (!game.isMoveValid(direction)) {
             return error.InvalidMove;
         }
         try game.setPosition(game.position + direction.getVec2());
     }
+
     pub fn setVerticalWall(game: *Game, position: Vec2, wall_value: WallType) !void {
         try game.board.setVerticalWall(position, wall_value);
     }
+
     pub fn setHorizontalWall(game: *Game, position: Vec2, wall_value: WallType) !void {
         try game.board.setHorizontalWall(position, wall_value);
     }
-    /// All border must be wall
-    /// All tiles should be connected
+
     pub fn isFinished(game: Game) bool {
         return game.position[0] == game.end_position[0] and game.position[1] == game.end_position[1];
     }
@@ -177,9 +231,13 @@ pub const Item = struct {
     };
     pub const Impl = struct {
         pick_up: *const fn (*anyopaque) void,
+        can_apply: *const fn (*anyopaque, *Game) bool,
         apply: *const fn (*anyopaque, *Game) void,
         json_stringify: *const fn (*anyopaque, std.mem.Allocator) error{OutOfMemory}![]u8,
     };
+    pub fn canApply(self: Item, game: *Game) bool {
+        return self.impl.can_apply(self.ptr, game);
+    }
     pub fn pickUp(self: Item) void {
         self.impl.pick_up(self.ptr);
     }
