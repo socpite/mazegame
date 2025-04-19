@@ -113,13 +113,13 @@ const Match = struct {
             ));
             const move_recieved = self.gamer_client.*.getNextJSONTimed(
                 self.allocator,
-                GameLib.Direction,
+                GameLib.GameTurn,
                 null,
             ) catch |err| {
                 std.debug.print("Read move failed: {}\n", .{err});
                 return self.messageFinished(MatchResult.MazerWin);
             };
-            self.game.move(move_recieved) catch |err| {
+            self.game.doTurn(move_recieved) catch |err| {
                 std.debug.print("Move failed: {}\n", .{err});
                 return self.messageFinished(MatchResult.MazerWin);
             };

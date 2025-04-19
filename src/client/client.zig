@@ -44,15 +44,12 @@ pub fn main() !void {
             std.debug.print("Sent maze\n", .{});
         } else if (std.mem.eql(u8, message, Client.REQUEST_MOVE_PROTOCOL)) {
             const game_input_json = try client.getNextJSONTimed(allocator, GameLib.GameJSON, null);
-            var game_input = try GameLib.getGameFromJSON(
+            const game_input = try GameLib.getGameFromJSON(
                 game_input_json,
                 allocator,
             );
-            if (game_input.isMoveValid(.Right)) {
-                try client.writeJSON(GameLib.Direction.Right);
-            } else if (game_input.isMoveValid(.Down)) {
-                try client.writeJSON(GameLib.Direction.Down);
-            }
+            const player_turn = try PlayerLoader.getMove(game_input);
+            try client.writeJSON(player_turn);
         } else if (std.mem.eql(u8, message, "Series draw")) {
             try client.deinit();
             break;

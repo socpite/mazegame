@@ -19,7 +19,7 @@ namespace example {
 // game.vertical_walls is a 2D array of size n x (m-1), where each element determines if there is a wall between the cell (i, j) and (i, j+1).
 // game.item_board is a 2D array of size n x m, where each element is the item name in the cell (i, j).
 Game create_maze(Game game) {
-    game.horizontal_walls[0][0] = true;
+    game.vertical_walls[0][0] = true;
     return game;
 }
 

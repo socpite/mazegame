@@ -8,6 +8,7 @@ pub const MazeBoard = struct {
     width: usize,
     vertical_walls: [][]WallType,
     horizontal_walls: [][]WallType,
+    luminated_tiles: [][]bool,
     buffer_board: [][]i32,
     item_board: [][]?[]const u8,
     /// Default maze has border wall only
@@ -40,6 +41,12 @@ pub const MazeBoard = struct {
             @memset(rows.*, null);
         }
 
+        const luminated_tiles = try arena.alloc([]bool, height);
+        for (luminated_tiles) |*rows| {
+            rows.* = try arena.alloc(bool, width);
+            @memset(rows.*, false);
+        }
+
         return MazeBoard{
             .height = height,
             .width = width,
@@ -47,6 +54,7 @@ pub const MazeBoard = struct {
             .horizontal_walls = horizontal_walls,
             .buffer_board = buffer_board,
             .item_board = item_board,
+            .luminated_tiles = luminated_tiles,
         };
     }
 
@@ -88,75 +96,67 @@ pub const MazeBoard = struct {
     }
 
     pub fn limitVision(mazeboard: MazeBoard, position: Vec2) void {
-        var is_visible = true;
         const px: usize = @intCast(position[0]);
         const py: usize = @intCast(position[1]);
+        // We first calculate the luminated_tiles, then calculate what walls are
+        mazeboard.luminated_tiles[px][py] = true;
+
+        // go up until finding a wall
         for (0..px) |x| {
             const rowid = px - x - 1;
-            if (!is_visible) {
-                mazeboard.horizontal_walls[rowid + 1][py] = .NotVisivle;
-            }
             if (mazeboard.horizontal_walls[rowid + 1][py].isWall()) {
-                is_visible = false;
+                break;
             }
-            for (mazeboard.vertical_walls[rowid], 0..) |*wall, y| {
-                if (wall.* == .BorderWall) {
-                    continue;
-                }
-                if (!is_visible or (y != py and y != py + 1)) {
-                    wall.* = .NotVisivle;
-                }
-            }
+            mazeboard.luminated_tiles[rowid][py] = true;
         }
-        is_visible = true;
+
+        // go down until finding a wall
         for (px + 1..mazeboard.height) |rowid| {
-            if (!is_visible) {
-                mazeboard.horizontal_walls[rowid][py] = .NotVisivle;
-            }
             if (mazeboard.horizontal_walls[rowid][py].isWall()) {
-                is_visible = false;
+                break;
             }
-            for (mazeboard.vertical_walls[rowid], 0..) |*wall, y| {
-                if (wall.* == .BorderWall) {
-                    continue;
-                }
-                if (!is_visible or (y != py and y != py + 1)) {
-                    wall.* = .NotVisivle;
-                }
-            }
+            mazeboard.luminated_tiles[rowid][py] = true;
         }
-        is_visible = true;
+
+        // go left until finding a wall
         for (0..py) |y| {
             const colid = py - y - 1;
-            if (!is_visible) {
-                mazeboard.vertical_walls[px][colid + 1] = .NotVisivle;
-            }
             if (mazeboard.vertical_walls[px][colid + 1].isWall()) {
-                is_visible = false;
+                break;
             }
-            for (0..mazeboard.width) |x| {
-                if (mazeboard.horizontal_walls[x][colid] == .BorderWall) {
+            mazeboard.luminated_tiles[px][colid] = true;
+        }
+
+        // go right until finding a wall
+        for (py + 1..mazeboard.width) |colid| {
+            if (mazeboard.vertical_walls[px][colid].isWall()) {
+                break;
+            }
+            mazeboard.luminated_tiles[px][colid] = true;
+        }
+
+        // We can see a wall if one of its sides is luminated
+        for (mazeboard.horizontal_walls, 0..) |*rows, x| {
+            for (rows.*, 0..) |*cell, y| {
+                if (cell.* == .BorderWall) {
                     continue;
                 }
-                if (!is_visible or (x != px and x != px + 1)) {
-                    mazeboard.horizontal_walls[x][colid] = .NotVisivle;
+                if (!mazeboard.luminated_tiles[x - 1][y] and
+                    !mazeboard.luminated_tiles[x][y])
+                {
+                    cell.* = .NotVisivle;
                 }
             }
         }
-        is_visible = true;
-        for (py + 1..mazeboard.width) |colid| {
-            if (!is_visible) {
-                mazeboard.vertical_walls[px][colid] = .NotVisivle;
-            }
-            if (mazeboard.vertical_walls[px][colid].isWall()) {
-                is_visible = false;
-            }
-            for (0..mazeboard.height) |x| {
-                if (mazeboard.horizontal_walls[x][colid] == .BorderWall) {
+        for (mazeboard.vertical_walls, 0..) |*rows, x| {
+            for (rows.*, 0..) |*cell, y| {
+                if (cell.* == .BorderWall) {
                     continue;
                 }
-                if (!is_visible or (x != px and x != px + 1)) {
-                    mazeboard.horizontal_walls[x][colid] = .NotVisivle;
+                if (!mazeboard.luminated_tiles[x][y - 1] and
+                    !mazeboard.luminated_tiles[x][y])
+                {
+                    cell.* = .NotVisivle;
                 }
             }
         }
@@ -169,6 +169,7 @@ pub const MazeBoard = struct {
             .horizontal_walls = try Utils.copyArr2d(WallType, self.horizontal_walls, allocator),
             .buffer_board = try Utils.copyArr2d(i32, self.buffer_board, allocator),
             .item_board = try Utils.copyArr2d(?[]const u8, self.item_board, allocator),
+            .luminated_tiles = try Utils.copyArr2d(bool, self.luminated_tiles, allocator),
         };
     }
     pub fn checkConsistentSize(self: MazeBoard) bool {
