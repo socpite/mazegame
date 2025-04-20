@@ -1,0 +1,61 @@
+[gd_scene load_steps=4 format=3 uid="uid://coyhloryl3yv4"]
+
+[ext_resource type="PackedScene" uid="uid://yk3xbdh1onix" path="res://board.tscn" id="1_ig7tw"]
+[ext_resource type="Script" uid="uid://b6runarm6qsi7" path="res://load_dialog.gd" id="2_0xm2m"]
+[ext_resource type="TileSet" uid="uid://fl8ngf0c734t" path="res://new_tile_set.tres" id="2_h2yge"]
+
+[node name="Main" type="Node2D"]
+
+[node name="Board" parent="." instance=ExtResource("1_ig7tw")]
+anchors_preset = 0
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 307.0
+offset_top = 145.0
+offset_right = 307.0
+offset_bottom = 145.0
+grow_horizontal = 1
+grow_vertical = 1
+pivot_offset = Vector2(0, 0)
+
+[node name="Background" type="TileMapLayer" parent="Board"]
+tile_set = ExtResource("2_h2yge")
+
+[node name="HorizontalWalls" type="TileMapLayer" parent="Board"]
+tile_set = ExtResource("2_h2yge")
+
+[node name="VerticalWalls" type="TileMapLayer" parent="Board"]
+tile_set = ExtResource("2_h2yge")
+
+[node name="Player" type="TileMapLayer" parent="Board"]
+tile_set = ExtResource("2_h2yge")
+
+[node name="Items" type="TileMapLayer" parent="Board"]
+tile_set = ExtResource("2_h2yge")
+
+[node name="LoadDialog" type="FileDialog" parent="."]
+initial_position = 2
+popup_window = true
+access = 2
+filters = PackedStringArray("*.mg25")
+use_native_dialog = true
+script = ExtResource("2_0xm2m")
+
+[node name="LoadButton" type="Button" parent="."]
+offset_left = 55.0
+offset_top = 153.0
+offset_right = 148.0
+offset_bottom = 201.0
+text = "Load game"
+
+[node name="CheckButton" type="CheckButton" parent="."]
+offset_left = 24.0
+offset_top = 209.0
+offset_right = 192.0
+offset_bottom = 240.0
+text = "Observer mode"
+
+[connection signal="file_selected" from="LoadDialog" to="Board" method="load_file"]
+[connection signal="pressed" from="LoadButton" to="LoadDialog" method="show"]

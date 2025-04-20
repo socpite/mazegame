@@ -1,0 +1,18 @@
+[gd_scene load_steps=2 format=3 uid="uid://yk3xbdh1onix"]
+
+[ext_resource type="Script" uid="uid://de2dt42ia4nv7" path="res://board.gd" id="1_p0ybc"]
+
+[node name="Board" type="ColorRect"]
+anchors_preset = -1
+anchor_left = 0.495
+anchor_top = 0.498
+anchor_right = 0.495
+anchor_bottom = 0.498
+offset_left = -269.24
+offset_top = -188.704
+offset_right = 265.76
+offset_bottom = 194.296
+grow_horizontal = 2
+grow_vertical = 2
+pivot_offset = Vector2(268, 188)
+script = ExtResource("1_p0ybc")

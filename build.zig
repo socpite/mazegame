@@ -43,6 +43,7 @@ pub fn build(b: *std.Build) void {
     const file_server_module = file_server.module("StaticHttpFileServer");
     server.root_module.addImport("StaticHttpFileServer", file_server_module);
     server.root_module.addImport("gamelib", gamelib_module);
+    server.linkLibC();
     b.installArtifact(server);
 
     const server_run_exe = b.addRunArtifact(server);
@@ -53,6 +54,7 @@ pub fn build(b: *std.Build) void {
     });
     server_check.root_module.addImport("StaticHttpFileServer", file_server_module);
     server_check.root_module.addImport("gamelib", gamelib_module);
+    server_check.linkLibC();
     check.dependOn(&server_check.step);
 
     if (b.args) |args| {
@@ -86,6 +88,8 @@ pub fn build(b: *std.Build) void {
         .root_module = client_module,
     });
     client_check.root_module.addImport("gamelib", gamelib_module);
+    client_check.linkLibC();
+    client_check.linkLibCpp();
     check.dependOn(&client_check.step);
 
     if (b.args) |args| {
