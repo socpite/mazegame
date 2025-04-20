@@ -2,6 +2,7 @@ const std = @import("std");
 const Queue = @import("queue.zig").Queue;
 const expect = std.testing.expect;
 
+pub const Evaluator = @import("evaluator.zig").Evaluator;
 pub const ItemLib = @import("item.zig");
 pub const MazeBoard = @import("mazeboard.zig").MazeBoard;
 pub const Utils = @import("utils.zig");
@@ -162,6 +163,11 @@ pub const Game = struct {
         }
         return null;
     }
+    pub fn applyChanges(self: *Game, edited_game: Game) !void {
+        self.board = try edited_game.board.deepCopy(self.arena.allocator());
+        self.position = edited_game.position;
+        self.end_position = edited_game.end_position;
+    }
     pub fn deinit(self: *Game) void {
         self.arena.deinit();
         self.allocator.free(self.item_list);
@@ -220,6 +226,23 @@ pub fn getGameWithLimitedVision(
     );
     new_game.board.limitVision(game.position);
     return new_game;
+}
+
+// directly convert game to json string. caller owns the string
+pub fn getGameAsJsonString(
+    game: Game,
+    allocator: std.mem.Allocator,
+) ![]const u8 {
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    const arena_allocator = arena.allocator();
+    const game_json = try getJSONFromGame(game, arena_allocator);
+    const json_string = try std.json.stringifyAlloc(
+        allocator,
+        game_json,
+        .{},
+    );
+    return json_string;
 }
 
 pub const Item = struct {
@@ -290,7 +313,7 @@ test "LimitVision" {
     try game.setVerticalWall(.{ 2, 2 }, .VisibleWall);
     try game.setHorizontalWall(.{ 1, 1 }, .VisibleWall);
     var limited_vision_game = try getGameWithLimitedVision(game, allocator);
-    try expect(try limited_vision_game.board.getVerticalWall(.{ 0, 1 }) == WallType.NotVisivle);
+    try expect(try limited_vision_game.board.getVerticalWall(.{ 0, 1 }) == WallType.NotVisible);
     try expect(try limited_vision_game.board.getVerticalWall(.{ 2, 1 }) == WallType.VisibleWall);
     try expect(try limited_vision_game.board.getHorizontalWall(.{ 1, 1 }) == WallType.VisibleWall);
     try game.setHorizontalWall(.{ 1, 1 }, .NoWall);

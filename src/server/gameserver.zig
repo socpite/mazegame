@@ -5,6 +5,11 @@ const Self = @This();
 const Connection = std.net.Server.Connection;
 const Client = GameLib.Client;
 const Checker = GameLib.Checker;
+const Evaluator = GameLib.Evaluator;
+const c = @cImport({
+    @cDefine("_NO_CRT_STDIO_INLINE", "1");
+    @cInclude("time.h");
+});
 
 var gpa1 = std.heap.GeneralPurposeAllocator(.{}){};
 var gpa2 = std.heap.GeneralPurposeAllocator(.{}){};
@@ -14,33 +19,63 @@ const Match = struct {
     mazer_client: *Client,
     gamer_client: *Client,
     allocator: std.mem.Allocator,
+    evaluator: Evaluator,
+
+    const MAX_TURN_COUNT = 10000;
     const MatchError = error{
         InvalidMaze,
         MazerTimeout,
         GamerTimeout,
+        ServerFailed,
     };
     const MatchResult = enum {
         Error,
         MazerWin,
         GamerWin,
     };
-    fn messageFinished(self: *Match, result: MatchResult) !void {
-        switch (result) {
-            MatchResult.MazerWin => {
-                try self.gamer_client.writeMessage("Mazer win");
-                try self.mazer_client.writeMessage("Mazer win");
-                self.mazer_client.score += 1;
+
+    /// Is called at the end of a match
+    fn messageFinished(self: *Match, gamer_score: f32) !void {
+        try self.gamer_client.writeMessage("Game finished. Score:");
+        try self.mazer_client.writeMessage("Game finished. Score:");
+        try self.gamer_client.writeJSON(gamer_score);
+        try self.mazer_client.writeJSON(gamer_score);
+        self.gamer_client.score += gamer_score;
+        try self.logToFile(null);
+    }
+
+    /// default file name is time stamp. Overwrites if file exists.
+    fn logToFile(self: Match, _file_name: ?[]const u8) !void {
+        const file_name = try self.allocator.dupe(
+            u8,
+            _file_name orelse blk: {
+                const current_time = c.time(0);
+                const name = std.mem.span(c.asctime(c.localtime(&current_time)));
+                break :blk name[0 .. name.len - 1];
             },
-            MatchResult.GamerWin => {
-                try self.gamer_client.writeMessage("Gamer win");
-                try self.mazer_client.writeMessage("Gamer win");
-                self.gamer_client.score += 1;
+        );
+        defer self.allocator.free(file_name);
+
+        std.mem.replaceScalar(u8, file_name, ' ', '_');
+        const full_name = try std.mem.concat(
+            self.allocator,
+            u8,
+            &.{
+                self.mazer_client.name,
+                "_vs_",
+                self.gamer_client.name,
+                "_",
+                file_name,
+                ".mg25",
             },
-            MatchResult.Error => {
-                try self.gamer_client.writeMessage("Error");
-                try self.mazer_client.writeMessage("Error");
-            },
-        }
+        );
+        defer self.allocator.free(full_name);
+        const log_dir = try std.fs.cwd().makeOpenPath("logs", .{});
+        const file = try log_dir.createFile(full_name, .{});
+        defer file.close();
+        self.evaluator.logToFile(file) catch |err| {
+            std.debug.print("Log to file failed: {}\n", .{err});
+        };
     }
     fn requestMaze(self: *Match) !void {
         var arena = std.heap.ArenaAllocator.init(self.allocator);
@@ -56,7 +91,7 @@ const Match = struct {
             GameLib.GameJSON,
             null,
         );
-        var new_game = try GameLib.getGameFromJSON(
+        const new_game = try GameLib.getGameFromJSON(
             json_game_received,
             arena_allocator,
         );
@@ -72,7 +107,7 @@ const Match = struct {
             return MatchError.InvalidMaze;
         }
         // This ensures that board is still owned by the game arena allocator
-        self.game.board = try new_game.board.deepCopy(self.game.arena.allocator());
+        try self.game.applyChanges(new_game);
         std.debug.print("Maze received\n", .{});
     }
     pub fn init(allocator: std.mem.Allocator, mazer_client: *Client, gamer_client: *Client) !Match {
@@ -87,19 +122,26 @@ const Match = struct {
                 null,
                 try Items.genItemList(&.{"Bomb"}, allocator),
             ),
+            .evaluator = undefined, // will be initialized in start
         };
     }
+
     fn start(self: *Match) !void {
         std.debug.print("Match started with {s}\n", .{self.mazer_client.name});
         self.requestMaze() catch |err| {
             std.debug.print("Request maze failed: {}\n", .{err});
-            return self.messageFinished(MatchResult.GamerWin);
+            return self.messageFinished(1.0);
         };
-        for (0..100) |_| {
+        self.evaluator = try Evaluator.init(
+            self.allocator,
+            self.game,
+        );
+        try self.gamer_client.writeMessage(Client.PREPARE_SOLVER_PROTOCOL);
+        for (0..MAX_TURN_COUNT) |_| {
             if (self.game.isFinished()) {
                 try self.gamer_client.writeMessage("Game finished");
                 try self.mazer_client.writeMessage("Game finished");
-                return self.messageFinished(MatchResult.GamerWin);
+                return self.messageFinished(1.0);
             }
             var limited_vision_game = try GameLib.getGameWithLimitedVision(
                 self.game,
@@ -117,23 +159,26 @@ const Match = struct {
                 null,
             ) catch |err| {
                 std.debug.print("Read move failed: {}\n", .{err});
-                return self.messageFinished(MatchResult.MazerWin);
+                return self.messageFinished(0.0);
             };
             self.game.doTurn(move_recieved) catch |err| {
                 std.debug.print("Move failed: {}\n", .{err});
-                return self.messageFinished(MatchResult.MazerWin);
+                return self.messageFinished(0.0);
             };
+            try self.evaluator.addTurn(limited_vision_game, move_recieved);
         }
         try self.gamer_client.writeMessage("Game finished");
         try self.mazer_client.writeMessage("Game finished");
         if (self.game.isFinished()) {
-            return self.messageFinished(MatchResult.GamerWin);
+            return self.messageFinished(try self.evaluator.calculateScore());
         } else {
-            return self.messageFinished(MatchResult.MazerWin);
+            return self.messageFinished(0.0);
         }
     }
+
     fn deinit(self: *Match) void {
         self.game.deinit();
+        self.evaluator.deinit();
     }
 };
 
@@ -142,7 +187,7 @@ pub const Series = struct {
     allocator: std.mem.Allocator,
     client_1: *Client,
     client_2: *Client,
-    const ROUND_COUNT = 12;
+    const ROUND_COUNT = 3;
     pub fn init(allocator: std.mem.Allocator, client_1: Connection, client_2: Connection) !Series {
         const new_client_1 = try allocator.create(Client);
         const new_client_2 = try allocator.create(Client);

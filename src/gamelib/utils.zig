@@ -19,16 +19,14 @@ pub const Direction = enum {
 pub const WallType = enum {
     VisibleWall,
     NoWall,
-    NotVisivle,
-    LuminatedWall,
+    NotVisible,
     BorderWall,
 
     pub fn isWall(wall: WallType) bool {
         return switch (wall) {
             WallType.VisibleWall => true,
             WallType.NoWall => false,
-            WallType.NotVisivle => false,
-            WallType.LuminatedWall => true,
+            WallType.NotVisible => false,
             WallType.BorderWall => true,
         };
     }

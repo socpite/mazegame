@@ -144,7 +144,7 @@ pub const MazeBoard = struct {
                 if (!mazeboard.luminated_tiles[x - 1][y] and
                     !mazeboard.luminated_tiles[x][y])
                 {
-                    cell.* = .NotVisivle;
+                    cell.* = .NotVisible;
                 }
             }
         }
@@ -156,7 +156,7 @@ pub const MazeBoard = struct {
                 if (!mazeboard.luminated_tiles[x][y - 1] and
                     !mazeboard.luminated_tiles[x][y])
                 {
-                    cell.* = .NotVisivle;
+                    cell.* = .NotVisible;
                 }
             }
         }

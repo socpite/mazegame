@@ -29,7 +29,9 @@ pub fn main() !void {
             break;
         };
         std.debug.print("Received message: {s}\n", .{message});
-        if (std.mem.eql(u8, message, Client.REQUEST_MAZE_PROTOCOL)) {
+        if (std.mem.eql(u8, message, Client.PREPARE_SOLVER_PROTOCOL)) {
+            PlayerLoader.prepareSolver();
+        } else if (std.mem.eql(u8, message, Client.REQUEST_MAZE_PROTOCOL)) {
             const game_input_json = try client.getNextJSONTimed(allocator, GameLib.GameJSON, null);
             const game_input = try GameLib.getGameFromJSON(
                 game_input_json,

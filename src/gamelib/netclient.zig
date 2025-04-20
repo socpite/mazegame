@@ -4,6 +4,7 @@ const Connection = std.net.Server.Connection;
 pub const Client = struct {
     pub const REQUEST_MAZE_PROTOCOL = "Request maze";
     pub const REQUEST_MOVE_PROTOCOL = "Request move";
+    pub const PREPARE_SOLVER_PROTOCOL = "Prepare solver";
     const StreamOptions = struct {
         // By default, timeout if infinite
         max_timeout_ms: u64 = std.math.maxInt(u64) / std.time.ns_per_ms,
@@ -11,7 +12,7 @@ pub const Client = struct {
     };
 
     stream: std.net.Stream,
-    score: u32 = 0,
+    score: f32 = 0,
     buffer: std.ArrayList(u8),
     stream_options: StreamOptions,
     mutex: std.Thread.Mutex,

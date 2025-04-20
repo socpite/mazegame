@@ -9,7 +9,6 @@ struct GameRule {
 };
 
 
-
 struct Game {
     int n, m;
     vector<vector<bool>> vertical_walls;
@@ -66,10 +65,12 @@ Game create_maze(Game game);
 
 GameMove get_move(Game game); 
 
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+    void prepare_solver();
     void test() {
         cout << "Test function called" << endl;
     }

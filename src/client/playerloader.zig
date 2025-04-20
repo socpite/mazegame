@@ -3,6 +3,7 @@ const Gamelib = @import("gamelib");
 const CGame = anyopaque;
 const CMove = anyopaque;
 
+var c_prepare_solver: *const fn () callconv(.c) void = undefined;
 var c_create_game: *const fn (c_int, c_int) callconv(.c) *CGame = undefined;
 var c_set_start_pos: *const fn (*anyopaque, c_int, c_int) callconv(.c) void = undefined;
 var c_add_item_type: *const fn (*CGame, [*:0]const u8) callconv(.c) void = undefined;
@@ -39,6 +40,7 @@ pub fn loadLibrary(filename: []const u8) !void {
     var lib = try std.DynLib.open(filename);
     defer lib.close();
 
+    c_prepare_solver = try loadSymbol(@TypeOf(c_prepare_solver), &lib, "prepare_solver");
     c_create_game = try loadSymbol(@TypeOf(c_create_game), &lib, "create_game");
     c_set_start_pos = try loadSymbol(@TypeOf(c_set_start_pos), &lib, "set_start_pos");
     c_add_item_type = try loadSymbol(@TypeOf(c_add_item_type), &lib, "add_item_type");
@@ -146,7 +148,7 @@ pub fn getGame(allocator: std.mem.Allocator, game: Gamelib.Game) !Gamelib.Game {
 
 pub fn CGameMoveToGameTurn(c_move: *CMove) Gamelib.GameTurn {
     const move_type = std.mem.span(c_get_move_type(c_move));
-    if (std.mem.eql(u8, move_type, "item")) {
+    if (std.mem.eql(u8, move_type, "Item")) {
         return .{ .item_name = std.mem.span(c_get_item_name(c_move)) };
     }
     return .{ .direction = std.meta.stringToEnum(Gamelib.Direction, move_type).? };
@@ -156,6 +158,10 @@ pub fn getMove(game: Gamelib.Game) !Gamelib.GameTurn {
     const c_game = try GameToCGame(game);
     const c_move = c_get_move(c_game);
     return CGameMoveToGameTurn(c_move);
+}
+
+pub fn prepareSolver() void {
+    c_prepare_solver();
 }
 
 test "Convert Game to CGame" {
