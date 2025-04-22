@@ -8,7 +8,7 @@ pub const Client = struct {
     const StreamOptions = struct {
         // By default, timeout if infinite
         max_timeout_ms: u64 = std.math.maxInt(u64) / std.time.ns_per_ms,
-        max_message_length: usize = 1 << 16,
+        max_message_length: usize = 1 << 30,
     };
 
     stream: std.net.Stream,
@@ -51,7 +51,6 @@ pub const Client = struct {
         _ = try self.stream.write("\n");
     }
     pub fn readMessage(self: Client, allocator: std.mem.Allocator) ![]u8 {
-        std.time.sleep(std.time.ns_per_ms * 20);
         if (self.is_closed) {
             return error.EndOfStream;
         }
@@ -164,9 +163,9 @@ pub const Client = struct {
         );
     }
     pub fn deinit(self: *Client) !void {
+        self.is_closed = true;
         try std.posix.shutdown(self.stream.handle, .both);
         self.debugPrint("Deinitializing client\n", .{});
-        self.is_closed = true;
         // Wait for the read loop to finish
         std.time.sleep(std.time.ns_per_ms * 1000);
         self.buffer.deinit();

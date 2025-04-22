@@ -37,7 +37,6 @@ pub fn main() !void {
             stream.close();
             break;
         };
-        std.debug.print("Received message: {s}\n", .{message});
         if (std.mem.eql(u8, message, Client.PREPARE_SOLVER_PROTOCOL)) {
             PlayerLoader.prepareSolver();
         } else if (std.mem.eql(u8, message, Client.REQUEST_MAZE_PROTOCOL)) {
@@ -61,9 +60,8 @@ pub fn main() !void {
             );
             const player_turn = try PlayerLoader.getMove(game_input);
             try client.writeJSON(player_turn);
-        } else if (std.mem.eql(u8, message, "Series draw")) {
-            try client.deinit();
-            break;
+        } else {
+            std.debug.print("Unknown message: {s}\n", .{message});
         }
     }
 }

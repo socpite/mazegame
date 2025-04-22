@@ -16,7 +16,7 @@ fn matchClients(client_1: Connection, client_2: Connection) !void {
 
     var series = try GameServer.Series.init(allocator, client_1, client_2);
     try series.start();
-    try series.deinit();
+    defer series.deinit();
 }
 
 fn runGameServer(server: *std.net.Server) !void {

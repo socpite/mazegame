@@ -139,9 +139,7 @@ const Match = struct {
         try self.gamer_client.writeMessage(Client.PREPARE_SOLVER_PROTOCOL);
         for (0..MAX_TURN_COUNT) |_| {
             if (self.game.isFinished()) {
-                try self.gamer_client.writeMessage("Game finished");
-                try self.mazer_client.writeMessage("Game finished");
-                return self.messageFinished(1.0);
+                break;
             }
             var limited_vision_game = try GameLib.getGameWithLimitedVision(
                 self.game,
@@ -243,9 +241,13 @@ pub const Series = struct {
             try self.client_2.writeMessage("Series draw");
         }
     }
-    pub fn deinit(self: Series) !void {
-        try self.client_1.deinit();
-        try self.client_2.deinit();
+    pub fn deinit(self: Series) void {
+        self.client_1.deinit() catch |err| {
+            std.debug.print("Client 1 deinit failed: {}\n", .{err});
+        };
+        self.client_2.deinit() catch |err| {
+            std.debug.print("Client 2 deinit failed: {}\n", .{err});
+        };
         self.allocator.destroy(self.client_1);
         self.allocator.destroy(self.client_2);
     }
