@@ -6,7 +6,6 @@ const Net = std.net;
 const Posix = std.posix;
 const GameServer = @import("gameserver.zig");
 
-const cwd = std.fs.cwd();
 const PORT: u16 = 8080;
 const PORT_HTTP: u16 = 8081;
 const MAX_BYTES: usize = (1 << 16);
@@ -42,6 +41,7 @@ fn runGameServer(server: *std.net.Server) !void {
 fn runHttpServer(server: *std.net.Server) !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
+    const cwd = std.fs.cwd();
     const dir = try cwd.openDir("src/server", .{ .iterate = true });
     while (true) {
         var shfs = try StaticHttpFileServer.init(.{ .allocator = allocator, .root_dir = dir });
@@ -72,7 +72,7 @@ fn runHttpServer(server: *std.net.Server) !void {
 }
 
 pub fn main() !void {
-    const addr = try Net.Address.parseIp("127.0.0.1", PORT);
+    const addr = try Net.Address.parseIp("0.0.0.0", PORT);
     const addr_http = try Net.Address.parseIp("127.0.0.1", PORT_HTTP);
     var server = try Net.Address.listen(addr, .{ .reuse_address = true });
     var http_server = try Net.Address.listen(addr_http, .{ .reuse_address = true });

@@ -3,15 +3,25 @@ const Net = std.net;
 const GameLib = @import("gamelib");
 const Client = GameLib.Client;
 const PlayerLoader = @import("playerloader.zig");
+const CliHandler = @import("cli_handler.zig");
 
 pub fn main() !void {
-    try PlayerLoader.loadLibrary("src/example/mylib.so");
-    std.debug.print("Starting client\n", .{});
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     var aa = std.heap.ArenaAllocator.init(gpa.allocator());
     defer aa.deinit();
     const allocator = aa.allocator();
-    const address = try Net.Address.parseIp("127.0.0.1", 8080);
+
+    try CliHandler.init(allocator);
+    defer CliHandler.deinit(allocator);
+
+    const player_lib_path = try CliHandler.getBotPath(allocator);
+    std.debug.print("Player lib path: {s}\n", .{player_lib_path});
+    var player_lib = try std.DynLib.open(player_lib_path);
+    defer player_lib.close();
+    try PlayerLoader.loadLibrary(&player_lib);
+
+    std.debug.print("Starting client\n", .{});
+    const address = try Net.Address.parseIp(CliHandler.server_ip, 8080);
     const stream = Net.tcpConnectToAddress(address) catch |err| {
         std.debug.print("Failed to connect to server: {}\n", .{err});
         return;
@@ -22,9 +32,8 @@ pub fn main() !void {
         .{},
         "my_name",
     );
-    try client.start();
     while (true) {
-        const message = client.getNextMessageTimed(allocator, null) catch {
+        const message = client.readMessage(allocator) catch {
             stream.close();
             break;
         };
@@ -32,7 +41,7 @@ pub fn main() !void {
         if (std.mem.eql(u8, message, Client.PREPARE_SOLVER_PROTOCOL)) {
             PlayerLoader.prepareSolver();
         } else if (std.mem.eql(u8, message, Client.REQUEST_MAZE_PROTOCOL)) {
-            const game_input_json = try client.getNextJSONTimed(allocator, GameLib.GameJSON, null);
+            const game_input_json = try client.readJSON(allocator, GameLib.GameJSON);
             const game_input = try GameLib.getGameFromJSON(
                 game_input_json,
                 allocator,
@@ -45,7 +54,7 @@ pub fn main() !void {
             try client.writeJSON(game_final_json);
             std.debug.print("Sent maze\n", .{});
         } else if (std.mem.eql(u8, message, Client.REQUEST_MOVE_PROTOCOL)) {
-            const game_input_json = try client.getNextJSONTimed(allocator, GameLib.GameJSON, null);
+            const game_input_json = try client.readJSON(allocator, GameLib.GameJSON);
             const game_input = try GameLib.getGameFromJSON(
                 game_input_json,
                 allocator,

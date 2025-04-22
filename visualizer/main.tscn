@@ -59,3 +59,4 @@ text = "Observer mode"
 
 [connection signal="file_selected" from="LoadDialog" to="Board" method="load_file"]
 [connection signal="pressed" from="LoadButton" to="LoadDialog" method="show"]
+[connection signal="toggled" from="CheckButton" to="Board" method="_on_check_button_toggled"]

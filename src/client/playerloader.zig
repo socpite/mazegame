@@ -36,30 +36,27 @@ fn loadSymbol(
     return sym;
 }
 
-pub fn loadLibrary(filename: []const u8) !void {
-    var lib = try std.DynLib.open(filename);
-    defer lib.close();
+pub fn loadLibrary(lib: *std.DynLib) !void {
+    c_prepare_solver = try loadSymbol(@TypeOf(c_prepare_solver), lib, "prepare_solver");
+    c_create_game = try loadSymbol(@TypeOf(c_create_game), lib, "create_game");
+    c_set_start_pos = try loadSymbol(@TypeOf(c_set_start_pos), lib, "set_start_pos");
+    c_add_item_type = try loadSymbol(@TypeOf(c_add_item_type), lib, "add_item_type");
+    c_set_horizontal_wall = try loadSymbol(@TypeOf(c_set_horizontal_wall), lib, "set_horizontal_wall");
+    c_set_vertical_wall = try loadSymbol(@TypeOf(c_set_vertical_wall), lib, "set_vertical_wall");
+    c_set_item = try loadSymbol(@TypeOf(c_set_item), lib, "set_item");
+    c_set_end_pos = try loadSymbol(@TypeOf(c_set_end_pos), lib, "set_end_pos");
 
-    c_prepare_solver = try loadSymbol(@TypeOf(c_prepare_solver), &lib, "prepare_solver");
-    c_create_game = try loadSymbol(@TypeOf(c_create_game), &lib, "create_game");
-    c_set_start_pos = try loadSymbol(@TypeOf(c_set_start_pos), &lib, "set_start_pos");
-    c_add_item_type = try loadSymbol(@TypeOf(c_add_item_type), &lib, "add_item_type");
-    c_set_horizontal_wall = try loadSymbol(@TypeOf(c_set_horizontal_wall), &lib, "set_horizontal_wall");
-    c_set_vertical_wall = try loadSymbol(@TypeOf(c_set_vertical_wall), &lib, "set_vertical_wall");
-    c_set_item = try loadSymbol(@TypeOf(c_set_item), &lib, "set_item");
-    c_set_end_pos = try loadSymbol(@TypeOf(c_set_end_pos), &lib, "set_end_pos");
-
-    c_get_width = try loadSymbol(@TypeOf(c_get_width), &lib, "get_width");
-    c_get_height = try loadSymbol(@TypeOf(c_get_height), &lib, "get_height");
-    c_get_end_pos = try loadSymbol(@TypeOf(c_get_end_pos), &lib, "get_end_pos");
-    c_get_item = try loadSymbol(@TypeOf(c_get_item), &lib, "get_item");
-    c_get_item_name = try loadSymbol(@TypeOf(c_get_item_name), &lib, "get_item_name");
-    c_get_move_type = try loadSymbol(@TypeOf(c_get_move_type), &lib, "get_move_type");
-    c_get_move = try loadSymbol(@TypeOf(c_get_move), &lib, "get_move");
-    c_get_maze = try loadSymbol(@TypeOf(c_get_maze), &lib, "get_maze");
-    c_get_start_pos = try loadSymbol(@TypeOf(c_get_start_pos), &lib, "get_start_pos");
-    c_get_horizontal_wall = try loadSymbol(@TypeOf(c_get_horizontal_wall), &lib, "get_horizontal_wall");
-    c_get_vertical_wall = try loadSymbol(@TypeOf(c_get_vertical_wall), &lib, "get_vertical_wall");
+    c_get_width = try loadSymbol(@TypeOf(c_get_width), lib, "get_width");
+    c_get_height = try loadSymbol(@TypeOf(c_get_height), lib, "get_height");
+    c_get_end_pos = try loadSymbol(@TypeOf(c_get_end_pos), lib, "get_end_pos");
+    c_get_item = try loadSymbol(@TypeOf(c_get_item), lib, "get_item");
+    c_get_item_name = try loadSymbol(@TypeOf(c_get_item_name), lib, "get_item_name");
+    c_get_move_type = try loadSymbol(@TypeOf(c_get_move_type), lib, "get_move_type");
+    c_get_move = try loadSymbol(@TypeOf(c_get_move), lib, "get_move");
+    c_get_maze = try loadSymbol(@TypeOf(c_get_maze), lib, "get_maze");
+    c_get_start_pos = try loadSymbol(@TypeOf(c_get_start_pos), lib, "get_start_pos");
+    c_get_horizontal_wall = try loadSymbol(@TypeOf(c_get_horizontal_wall), lib, "get_horizontal_wall");
+    c_get_vertical_wall = try loadSymbol(@TypeOf(c_get_vertical_wall), lib, "get_vertical_wall");
 }
 
 fn GameToCGame(game: Gamelib.Game) !*CGame {
@@ -166,7 +163,10 @@ pub fn prepareSolver() void {
 
 test "Convert Game to CGame" {
     const allocator = std.testing.allocator;
-    try loadLibrary("src/example/mylib.so");
+    var player_lib = try std.DynLib.open("src/example/mylib.so");
+    defer player_lib.close();
+    try loadLibrary(&player_lib);
+
     var game = try Gamelib.Game.init(
         allocator,
         .{ .width = 5, .height = 5 },
@@ -186,7 +186,10 @@ test "Convert Game to CGame" {
 
 test "Get a move" {
     const allocator = std.testing.allocator;
-    try loadLibrary("src/example/mylib.so");
+    var player_lib = try std.DynLib.open("src/example/mylib.so");
+    defer player_lib.close();
+    try loadLibrary(&player_lib);
+
     var game = try Gamelib.Game.init(
         allocator,
         .{ .width = 5, .height = 5 },

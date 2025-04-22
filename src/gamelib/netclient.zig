@@ -61,6 +61,19 @@ pub const Client = struct {
             self.stream_options.max_message_length,
         );
     }
+    pub fn readJSON(
+        self: Client,
+        allocator: std.mem.Allocator,
+        comptime T: type,
+    ) !T {
+        const message = try self.readMessage(allocator);
+        return try std.json.parseFromSliceLeaky(
+            T,
+            allocator,
+            message,
+            .{},
+        );
+    }
     fn addMessage(self: *Client, message: []const u8) !void {
         self.mutex.lock();
         try self.buffer.appendSlice(message);

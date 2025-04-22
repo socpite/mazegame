@@ -12,6 +12,7 @@ var maze_width
 var maze_height
 var current_turn
 var current_board
+var observer_mode = false
 
 var wall_id = {"BorderWall": 1, "VisibleWall": 0, "NoWall": 2, "NotVisible": 2}
 var item_id = {"Chest": 0, "Bomb": 1}
@@ -51,12 +52,12 @@ func render_all():
 	render_items()
 
 func render_walls():
-	var hwalls = current_board.board.horizontal_walls
+	var hwalls = original_board.board.horizontal_walls if observer_mode else current_board.board.horizontal_walls
 	for i in len(hwalls):
 		for j in len(hwalls[i]):
 			$HorizontalWalls.set_cell(Vector2i(j, i), 1, Vector2i(wall_id[hwalls[i][j]], 1))
 	
-	var vwalls = current_board.board.vertical_walls
+	var vwalls = original_board.board.vertical_walls if observer_mode else current_board.board.vertical_walls
 	for i in len(vwalls):
 		for j in len(vwalls[i]):
 			$VerticalWalls.set_cell(Vector2i(j, i), 1, Vector2i(wall_id[vwalls[i][j]], 0))
@@ -89,3 +90,8 @@ func check_prev_turn():
 		if current_turn == 0:
 			return
 		set_turn(current_turn - 1)
+
+
+func _on_check_button_toggled(toggled_on: bool) -> void:
+	observer_mode = toggled_on
+	render_all() # Replace with function body.
