@@ -37,3 +37,7 @@ The visualizer is a seperate program to review you game. To use the visualizer, 
 ## Self-hosted server
 
 Download the latest server version of the game matching your platform from the `release` section of this repository. Edit the `settings.txt` file to adjust the server settings. After that, run `start_server.bat` to start the server. The server will start listening for clients and you can connect to it using the client. The server will create a `logs` folder in the same directory as the server executable. The logs folder will contain all the game logs.
+
+## Contributing
+
+Idk bro just PR and I'll review. Just try to follow the code style of the project. If you want to add a new feature, please open an issue first to discuss it with me. I will be happy to help you with your PR. 
