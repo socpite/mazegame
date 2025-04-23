@@ -168,6 +168,7 @@ const Match = struct {
         try self.gamer_client.writeMessage("Game finished");
         try self.mazer_client.writeMessage("Game finished");
         if (self.game.isFinished()) {
+            std.debug.print("Game finished {}\n", .{try self.evaluator.calculateScore()});
             return self.messageFinished(try self.evaluator.calculateScore());
         } else {
             return self.messageFinished(0.0);
