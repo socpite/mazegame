@@ -180,7 +180,7 @@ pub const MazeBoard = struct {
             .vertical_walls = try Utils.copyArr2d(WallType, self.vertical_walls, allocator),
             .horizontal_walls = try Utils.copyArr2d(WallType, self.horizontal_walls, allocator),
             .buffer_board = try Utils.copyArr2d(i32, self.buffer_board, allocator),
-            .item_board = try Utils.copyArr2d(?[]const u8, self.item_board, allocator),
+            .item_board = try Utils.copyItemBoard(self.item_board, allocator),
             .luminated_tiles = try Utils.copyArr2d(bool, self.luminated_tiles, allocator),
         };
     }

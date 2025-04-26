@@ -142,6 +142,21 @@ pub const Game = struct {
             return error.InvalidMove;
         }
         try game.setPosition(game.position + direction.getVec2());
+        const new_item = try Utils.getArr2d(
+            ?[]const u8,
+            game.board.item_board,
+            game.position,
+        );
+        if (new_item) |item_name| {
+            const item = game.findItem(item_name) orelse return error.ItemNotFound;
+            item.pickUp();
+            try Utils.setArr2d(
+                ?[]const u8,
+                game.board.item_board,
+                null,
+                game.position,
+            );
+        }
     }
 
     pub fn setVerticalWall(game: *Game, position: Vec2, wall_value: WallType) !void {
@@ -181,7 +196,7 @@ pub fn getJSONFromGame(game: Game, arena: std.mem.Allocator) !GameJSON {
         item_json.* = try item.jsonStringify(arena);
     }
     return GameJSON{
-        .board = game.board,
+        .board = try game.board.deepCopy(arena),
         .position = game.position,
         .end_position = game.end_position,
         .item_list = item_list,

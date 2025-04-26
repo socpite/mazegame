@@ -77,8 +77,8 @@ namespace example{
     void set_random_items(Game &game) {
         if (game.rule.predetermined_items) return;
         if (game.item_types.empty()) return;
-        for (int i = 0; i < 2; i++) {
-            for (int j = 0; j < 2; j++) {
+        for (int i = 0; i < game.n; i++) {
+            for (int j = 0; j < game.m; j++) {
                 if (game.start_pos == make_pair(i, j) || game.end_pos == make_pair(i, j)) continue;
                 game.item_board[i][j] = game.item_types[example::rng() % game.item_types.size()];
             }

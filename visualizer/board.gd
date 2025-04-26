@@ -82,8 +82,14 @@ func check_next_turn():
 func render_items():
 	$Items.clear()
 	var end_position = current_board.end_position
-	print(Vector2i(end_position[1], end_position[0]))
+	var items = original_board.board.item_board if observer_mode else current_board.board.item_board
+	for i in len(items):
+		for j in len(items[i]):
+			if !items[i][j]:
+				continue
+			$Items.set_cell(Vector2i(j, i), 5, Vector2i(0, item_id[items[i][j]]))
 	$Items.set_cell(Vector2i(end_position[1], end_position[0]), 5, Vector2i(0, item_id.Chest))
+	
 
 func check_prev_turn():
 	if Input.is_action_just_pressed("last turn"):

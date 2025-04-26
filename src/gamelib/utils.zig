@@ -45,6 +45,21 @@ pub fn copyArr2d(
     return new_arr;
 }
 
+pub fn copyItemBoard(arr: []const []const ?[]const u8, allocator: std.mem.Allocator) ![][]?[]const u8 {
+    const new_arr = try allocator.alloc([]?[]const u8, arr.len);
+    for (arr, new_arr) |row, *new_row| {
+        new_row.* = try allocator.alloc(?[]const u8, row.len);
+        for (row, new_row.*) |item, *new_item| {
+            if (item == null) {
+                new_item.* = null;
+            } else {
+                new_item.* = try allocator.dupe(u8, item.?);
+            }
+        }
+    }
+    return new_arr;
+}
+
 pub fn checkSameArr2d(comptime T: type, arr1: [][]T, arr2: [][]T) bool {
     if (arr1.len != arr2.len) {
         return false;
