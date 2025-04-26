@@ -29,10 +29,10 @@ tile_set = ExtResource("2_h2yge")
 [node name="VerticalWalls" type="TileMapLayer" parent="Board"]
 tile_set = ExtResource("2_h2yge")
 
-[node name="Player" type="TileMapLayer" parent="Board"]
+[node name="Items" type="TileMapLayer" parent="Board"]
 tile_set = ExtResource("2_h2yge")
 
-[node name="Items" type="TileMapLayer" parent="Board"]
+[node name="Player" type="TileMapLayer" parent="Board"]
 tile_set = ExtResource("2_h2yge")
 
 [node name="LoadDialog" type="FileDialog" parent="."]
