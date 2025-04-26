@@ -15,7 +15,7 @@ var gpa1 = std.heap.GeneralPurposeAllocator(.{}){};
 var gpa2 = std.heap.GeneralPurposeAllocator(.{}){};
 
 const Match = struct {
-    game: GameLib.Game,
+    game: *GameLib.Game,
     mazer_client: *Client,
     gamer_client: *Client,
     allocator: std.mem.Allocator,
@@ -83,7 +83,7 @@ const Match = struct {
         const arena_allocator = arena.allocator();
         try self.mazer_client.writeMessage(Client.REQUEST_MAZE_PROTOCOL);
         try self.mazer_client.writeJSON(try GameLib.getJSONFromGame(
-            self.game,
+            self.game.*,
             arena_allocator,
         ));
         const json_game_received = try self.mazer_client.*.getNextJSONTimed(
@@ -101,7 +101,7 @@ const Match = struct {
             std.debug.print("Invalid maze size\n", .{});
             return MatchError.InvalidMaze;
         }
-        const check_result = try Checker.checkEligible(self.game, new_game, .{});
+        const check_result = try Checker.checkEligible(self.game.*, new_game, .{});
         if (check_result != .Valid) {
             std.debug.print("Maze check failed with status: {}\n", .{check_result});
             return MatchError.InvalidMaze;
@@ -110,18 +110,17 @@ const Match = struct {
         try self.game.applyChanges(new_game);
         std.debug.print("Maze received\n", .{});
     }
-    pub fn init(allocator: std.mem.Allocator, mazer_client: *Client, gamer_client: *Client) !Match {
+    pub fn init(
+        allocator: std.mem.Allocator,
+        mazer_client: *Client,
+        gamer_client: *Client,
+        game: *GameLib.Game,
+    ) !Match {
         return Match{
             .allocator = allocator,
             .mazer_client = mazer_client,
             .gamer_client = gamer_client,
-            .game = try GameLib.Game.init(
-                allocator,
-                .{},
-                null,
-                null,
-                try Items.genItemList(&.{"Bomb"}, allocator),
-            ),
+            .game = game,
             .evaluator = undefined, // will be initialized in start
         };
     }
@@ -134,7 +133,7 @@ const Match = struct {
         };
         self.evaluator = try Evaluator.init(
             self.allocator,
-            self.game,
+            self.game.*,
         );
         try self.gamer_client.writeMessage(Client.PREPARE_SOLVER_PROTOCOL);
         for (0..MAX_TURN_COUNT) |_| {
@@ -142,7 +141,7 @@ const Match = struct {
                 break;
             }
             var limited_vision_game = try GameLib.getGameWithLimitedVision(
-                self.game,
+                self.game.*,
                 self.allocator,
             );
             defer limited_vision_game.deinit();
@@ -175,7 +174,7 @@ const Match = struct {
         }
     }
 
-    fn deinit(self: *Match) void {
+    fn deinit(self: Match) void {
         self.game.deinit();
         self.evaluator.deinit();
     }
@@ -215,20 +214,29 @@ pub const Series = struct {
         try self.client_1.writeMessage("Series start");
         try self.client_2.writeMessage("Series start");
         std.debug.print("Series started\n", .{});
-        for (0..ROUND_COUNT) |_| {
+        for (0..ROUND_COUNT * 2) |_| {
+            var arena = std.heap.ArenaAllocator.init(self.allocator);
+            const arena_allocator = arena.allocator();
+            const item_list = try Items.genItemList(
+                &.{
+                    "Bomb",
+                },
+                arena_allocator,
+            );
+            var game = try GameLib.Game.init(
+                self.allocator,
+                .{},
+                null,
+                null,
+                item_list,
+            );
             var match = try Match.init(
                 self.allocator,
                 self.client_1,
                 self.client_2,
+                &game,
             );
-            try match.start();
-        }
-        for (0..ROUND_COUNT) |_| {
-            var match = try Match.init(
-                self.allocator,
-                self.client_2,
-                self.client_1,
-            );
+            defer match.deinit();
             try match.start();
         }
         if (self.client_1.score > self.client_2.score) {

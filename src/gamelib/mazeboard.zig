@@ -160,6 +160,18 @@ pub const MazeBoard = struct {
                 }
             }
         }
+
+        // We can see item if the tile is luminated
+        for (mazeboard.item_board, 0..) |*rows, x| {
+            for (rows.*, 0..) |*cell, y| {
+                if (cell.* == null) {
+                    continue;
+                }
+                if (!mazeboard.luminated_tiles[x][y]) {
+                    cell.* = null;
+                }
+            }
+        }
     }
     pub fn deepCopy(self: MazeBoard, allocator: std.mem.Allocator) !MazeBoard {
         return MazeBoard{

@@ -70,7 +70,7 @@ const AllItemType = enum {
     Bomb,
 };
 
-/// Caller owns the item
+/// Caller owns the item.
 pub fn strToItem(name: []const u8, allocator: std.mem.Allocator) !Item {
     const item_type = std.meta.stringToEnum(AllItemType, name).?;
     return switch (item_type) {

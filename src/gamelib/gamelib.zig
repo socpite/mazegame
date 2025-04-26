@@ -32,7 +32,7 @@ pub const Game = struct {
         board: ?MazeBoard = null,
     };
 
-    /// item_list and board is copied
+    /// item_list and board is copied. Please make sure that the item pointer outlives the game.
     pub fn init(
         allocator: std.mem.Allocator,
         maze_options: MazeOptions,
@@ -168,7 +168,7 @@ pub const Game = struct {
         self.position = edited_game.position;
         self.end_position = edited_game.end_position;
     }
-    pub fn deinit(self: *Game) void {
+    pub fn deinit(self: Game) void {
         self.arena.deinit();
         self.allocator.free(self.item_list);
     }

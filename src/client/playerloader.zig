@@ -11,6 +11,7 @@ var c_set_horizontal_wall: *const fn (*CGame, c_int, c_int, bool) callconv(.c) v
 var c_set_vertical_wall: *const fn (*CGame, c_int, c_int, bool) callconv(.c) void = undefined;
 var c_set_item: *const fn (*CGame, c_int, c_int, [*:0]const u8) callconv(.c) void = undefined;
 var c_set_end_pos: *const fn (*CGame, c_int, c_int) callconv(.c) void = undefined;
+var c_set_game_rule: *const fn (*CGame, bool, bool, c_int) callconv(.c) void = undefined;
 
 var c_get_width: *const fn (*CGame) callconv(.c) c_int = undefined;
 var c_get_height: *const fn (*CGame) callconv(.c) c_int = undefined;
@@ -39,6 +40,7 @@ fn loadSymbol(
 pub fn loadLibrary(lib: *std.DynLib) !void {
     c_prepare_solver = try loadSymbol(@TypeOf(c_prepare_solver), lib, "prepare_solver");
     c_create_game = try loadSymbol(@TypeOf(c_create_game), lib, "create_game");
+    c_set_game_rule = try loadSymbol(@TypeOf(c_set_game_rule), lib, "set_game_rule");
     c_set_start_pos = try loadSymbol(@TypeOf(c_set_start_pos), lib, "set_start_pos");
     c_add_item_type = try loadSymbol(@TypeOf(c_add_item_type), lib, "add_item_type");
     c_set_horizontal_wall = try loadSymbol(@TypeOf(c_set_horizontal_wall), lib, "set_horizontal_wall");
@@ -63,6 +65,12 @@ fn GameToCGame(game: Gamelib.Game) !*CGame {
     const c_game = c_create_game(@intCast(game.board.height), @intCast(game.board.width));
     c_set_start_pos(c_game, @intCast(game.position[0]), @intCast(game.position[1]));
     c_set_end_pos(c_game, @intCast(game.end_position[0]), @intCast(game.end_position[1]));
+    c_set_game_rule(
+        c_game,
+        game.rules.predetermined_walls,
+        game.rules.predetermined_item_position,
+        @intCast(game.rules.min_item_count),
+    );
     var arena = std.heap.ArenaAllocator.init(game.allocator);
     const temp_allocator = arena.allocator();
     defer arena.deinit();

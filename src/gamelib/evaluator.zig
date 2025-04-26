@@ -79,7 +79,7 @@ pub const Evaluator = struct {
         );
     }
     pub fn deinit(self: Evaluator) void {
-        self.allocator.destroy(self.match_info.original_game_json);
+        self.allocator.free(self.match_info.original_game_json);
         for (self.match_info.turn_info_list.items) |*turn_info| {
             self.allocator.free(turn_info.maze_sent_json);
             self.allocator.free(turn_info.gamer_turn_json);

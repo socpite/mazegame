@@ -45,6 +45,23 @@ pub fn copyArr2d(
     return new_arr;
 }
 
+pub fn checkSameArr2d(comptime T: type, arr1: [][]T, arr2: [][]T) bool {
+    if (arr1.len != arr2.len) {
+        return false;
+    }
+    for (arr1, arr2) |row1, row2| {
+        if (row1.len != row2.len) {
+            return false;
+        }
+        for (row1, row2) |cell1, cell2| {
+            if (cell1 != cell2) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 pub fn checkInboundArr2d(comptime T: type, arr: [][]T, position: Vec2) bool {
     return 0 <= position[0] and position[0] < arr.len and 0 <= position[1] and position[1] < arr[0].len;
 }

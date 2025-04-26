@@ -7,12 +7,14 @@ const Direction = GameLib.Direction;
 const Utils = GameLib.Utils;
 
 pub const GameRule = struct {
-    min_item_count: usize = 0,
+    predetermined_walls: bool = false,
     predetermined_item_position: bool = false,
+    min_item_count: usize = 0,
 };
 
 const CheckStatus = enum(usize) {
     Valid = 0,
+    SameStartEndPosition,
     InvalidWall,
     CanGoOutside,
     NotConnected,
@@ -115,6 +117,7 @@ pub fn checkEligiblieItemBoard(
     }
     if (game_rule.predetermined_item_position) {
         if (!checkSameItemBoard(game, edited_game)) {
+            std.debug.print("Item board is not the same\n", .{});
             return .InvalidItem;
         }
     }
@@ -123,7 +126,34 @@ pub fn checkEligiblieItemBoard(
         edited_game,
         game_rule.min_item_count,
     )) {
+        std.debug.print("Not enough item\n", .{});
         return .NotEnoughItem;
+    }
+    // starting point should not have an item
+    if (Utils.getArr2d(?[]const u8, edited_game.board.item_board, edited_game.position) catch unreachable != null) {
+        std.debug.print("Starting point has an item\n", .{});
+        return .InvalidItem;
+    }
+    return .Valid;
+}
+
+pub fn checkSameWalls(
+    game: Game,
+    edited_game: Game,
+) CheckStatus {
+    if (!Utils.checkSameArr2d(
+        GameLib.WallType,
+        game.board.horizontal_walls,
+        edited_game.board.horizontal_walls,
+    )) {
+        return .InvalidWall;
+    }
+    if (!Utils.checkSameArr2d(
+        GameLib.WallType,
+        game.board.vertical_walls,
+        edited_game.board.vertical_walls,
+    )) {
+        return .InvalidWall;
     }
     return .Valid;
 }
@@ -132,6 +162,12 @@ pub fn checkEligibleWalls(
     game: Game,
     edited_game: Game,
 ) CheckStatus {
+    if (game.rules.predetermined_walls) {
+        if (checkSameWalls(game, edited_game) != .Valid) {
+            return .InvalidWall;
+        }
+    }
+
     for (edited_game.board.horizontal_walls, game.board.horizontal_walls) |edited_row, row| {
         for (edited_row, row) |edited_wall, wall| {
             if (wall == .BorderWall) {
@@ -175,6 +211,9 @@ pub fn checkEligible(game: Game, edited_game: Game, game_rule: GameRule) !CheckS
     }
     if (edited_game.board.checkInbound(edited_game.end_position) == false) {
         return .EndPositionOutOfBound;
+    }
+    if (edited_game.position[0] == edited_game.end_position[0] and edited_game.position[1] == edited_game.end_position[1]) {
+        return .SameStartEndPosition;
     }
 
     const bfs_check = try tryBFS(edited_game);
