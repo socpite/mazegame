@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Mazegame – Move payload",
+  "type": "object",
+  "oneOf": [
+    {
+      "required": ["direction"],
+      "properties": {
+        "direction": {
+          "type": "string",
+          "enum": ["Up", "Down", "Left", "Right"]
+        }
+      }
+    },
+    {
+      "required": ["item_name"],
+      "properties": { "item_name": { "type": "string" } }
+    }
+  ]
+}

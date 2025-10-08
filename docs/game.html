@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Game JSON Schema</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>Game JSON Schema</h1>
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="move.html">Move JSON</a>
+    <a href="schemas/game.schema.json">Raw JSON-Schema</a>
+  </nav>
+  <h2>Overview</h2>
+  <p>The <code>Game</code> payload includes the maze board, player position, end position, and item list.</p>
+
+  <h2>Example</h2>
+  <pre><code>{
+  "board": {
+    "height": 3,
+    "width": 3,
+    "vertical_walls": [
+      ["BorderWall","NoWall","NoWall","BorderWall"],
+      ["BorderWall","NoWall","NoWall","BorderWall"],
+      ["BorderWall","NoWall","NoWall","BorderWall"]
+    ],
+    "horizontal_walls": [
+      ["BorderWall","BorderWall","BorderWall"],
+      ["NoWall","NoWall","NoWall"],
+      ["BorderWall","BorderWall","BorderWall"],
+      ["BorderWall","BorderWall","BorderWall"]
+    ],
+    "luminated_tiles": [
+      [true,false,false],
+      [true,true,false],
+      [false,false,false]
+    ],
+    "buffer_board": [
+      [0,0,0],
+      [0,0,0],
+      [0,0,0]
+    ],
+    "item_board": [
+      [null,"Bomb;{\"timer\":3}",null],
+      [null,null,null],
+      [null,null,null]
+    ]
+  },
+  "position": [0,0],
+  "end_position": [2,2],
+  "item_list": ["Bomb;{\"timer\":3}"]
+}</code></pre>
+
+  <h2>Fields</h2>
+  <ul>
+    <li><code>board</code>: full <code>MazeBoard</code> object</li>
+    <li><code>position</code>: starting tile (<code>[row, col]</code>)</li>
+    <li><code>end_position</code>: goal tile (<code>[row, col]</code>)</li>
+    <li><code>item_list</code>: array of serialized items</li>
+  </ul>
+</body>
+</html>

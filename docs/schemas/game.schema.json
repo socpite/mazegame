@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Mazegame – Game payload",
+  "type": "object",
+  "required": ["board", "position", "end_position", "item_list"],
+  "properties": {
+    "board": { "$ref": "#/$defs/MazeBoard" },
+    "position": { "$ref": "#/$defs/Vec2" },
+    "end_position": { "$ref": "#/$defs/Vec2" },
+    "item_list": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "description": "Serialized item in the form \"<ItemName>;{…}\""
+      }
+    }
+  },
+  "$defs": {
+    "Vec2": {
+      "type": "array",
+      "prefixItems": [
+        { "type": "integer" },
+        { "type": "integer" }
+      ],
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "WallType": {
+      "type": "string",
+      "enum": ["VisibleWall", "NoWall", "NotVisible", "BorderWall"]
+    },
+    "MazeBoard": {
+      "type": "object",
+      "required": [
+        "height", "width",
+        "vertical_walls", "horizontal_walls",
+        "luminated_tiles", "buffer_board", "item_board"
+      ],
+      "properties": {
+        "height": { "type": "integer", "minimum": 1 },
+        "width":  { "type": "integer", "minimum": 1 },
+        "vertical_walls": {
+          "type": "array",
+          "items": { "type": "array", "items": { "$ref": "#/$defs/WallType" } }
+        },
+        "horizontal_walls": {
+          "type": "array",
+          "items": { "type": "array", "items": { "$ref": "#/$defs/WallType" } }
+        },
+        "luminated_tiles": {
+          "type": "array",
+          "items": { "type": "array", "items": { "type": "boolean" } }
+        },
+        "buffer_board": {
+          "type": "array",
+          "items": { "type": "array", "items": { "type": "integer" } }
+        },
+        "item_board": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": { "anyOf": [ { "type": "null" }, { "type": "string" } ] }
+          }
+        }
+      }
+    }
+  }
+}
