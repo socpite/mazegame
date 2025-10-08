@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <title>Move JSON Schema</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://unpkg.com/jsoneditor@9.9.0/dist/jsoneditor.min.css">
+  <script src="https://unpkg.com/jsoneditor@9.9.0/dist/jsoneditor.min.js"></script>
 </head>
 <body>
   <h1>Move JSON Schema</h1>
@@ -20,5 +22,16 @@
 
   <h2>Example – item</h2>
   <pre><code>{ "item_name": "Bomb" }</code></pre>
+
+  <h2>Interactive schema</h2>
+  <div id="schema-editor" style="height: 400px;"></div>
+  <script>
+    fetch('schemas/move.schema.json')
+      .then(res => res.json())
+      .then(schema => {
+        const container = document.getElementById('schema-editor');
+        const editor = new JSONEditor(container, { schema, mode: 'view' });
+      });
+  </script>
 </body>
 </html>
