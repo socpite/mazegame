@@ -23,12 +23,6 @@
     // `zig build --fetch` can be used to fetch all dependencies of a package, recursively.
     // Once all dependencies are fetched, `zig build` no longer requires
     // internet connectivity.
-    .dependencies = .{
-        .StaticHttpFileServer = .{
-            .url = "https://github.com/andrewrk/StaticHttpFileServer/archive/eb0854fe2d3472dfc2729cdf1bfa7ce63ec11307.tar.gz",
-            .hash = "StaticHttpFileServer-0.1.0-j-0gwYE2AABz1ygXwqUFg8kDRINo1JELVngNRg6JA9rh",
-        },
-    },
     .paths = .{
         "build.zig",
         "build.zig.zon",

@@ -26,14 +26,14 @@ pub fn main() !void {
         std.debug.print("Failed to connect to server: {}\n", .{err});
         return;
     };
-    var client = Client.init(
+    var client = try Client.init(
         allocator,
         stream,
         .{},
         "my_name",
     );
     while (true) {
-        const message = client.readMessage(allocator) catch {
+        const message = client.readMessage() catch {
             stream.close();
             break;
         };

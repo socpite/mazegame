@@ -5,6 +5,7 @@ pub const Client = struct {
     pub const REQUEST_MAZE_PROTOCOL = "Request maze";
     pub const REQUEST_MOVE_PROTOCOL = "Request move";
     pub const PREPARE_SOLVER_PROTOCOL = "Prepare solver";
+    const BUFFER_LENGTH = 1 << 16;
     const StreamOptions = struct {
         // By default, timeout if infinite
         max_timeout_ms: u64 = std.math.maxInt(u64) / std.time.ns_per_ms,
@@ -12,8 +13,11 @@ pub const Client = struct {
     };
 
     stream: std.net.Stream,
+    reader: std.net.Stream.Reader,
+    writer: std.net.Stream.Writer,
     score: f32 = 0,
-    buffer: std.ArrayList(u8),
+    buffer: std.array_list.Aligned(u8, null),
+    allocator: std.mem.Allocator,
     stream_options: StreamOptions,
     mutex: std.Thread.Mutex,
     condition: std.Thread.Condition,
@@ -26,10 +30,13 @@ pub const Client = struct {
         stream: std.net.Stream,
         stream_options: StreamOptions,
         name: []const u8,
-    ) Client {
+    ) !Client {
         return Client{
             .stream = stream,
-            .buffer = std.ArrayList(u8).init(allocator),
+            .allocator = allocator,
+            .buffer = std.array_list.Aligned(u8, null).empty,
+            .reader = stream.reader(try allocator.alloc(u8, BUFFER_LENGTH)),
+            .writer = stream.writer(&.{}),
             .stream_options = stream_options,
             .mutex = .{},
             .condition = .{},
@@ -42,30 +49,29 @@ pub const Client = struct {
         loop_thread.detach();
     }
 
-    pub fn writeMessage(self: Client, message: []const u8) !void {
-        _ = try self.stream.write(message);
-        _ = try self.stream.write("\n");
+    pub fn writeMessage(self: *Client, message: []const u8) !void {
+        _ = try self.writer.interface.write(message);
+        _ = try self.writer.interface.write("\n");
+        self.debugPrint("{s} wrote: {s}", .{ self.name, message });
     }
-    pub fn writeJSON(self: Client, value: anytype) !void {
-        try std.json.stringify(value, .{}, self.stream.writer());
-        _ = try self.stream.write("\n");
+    pub fn writeJSON(self: *Client, value: anytype) !void {
+        try std.json.Stringify.value(value, .{}, &self.writer.interface);
+        _ = try self.writer.interface.write("\n");
     }
-    pub fn readMessage(self: Client, allocator: std.mem.Allocator) ![]u8 {
+    pub fn readMessage(self: *Client) ![]u8 {
         if (self.is_closed) {
             return error.EndOfStream;
         }
-        return self.stream.reader().readUntilDelimiterAlloc(
-            allocator,
-            '\n',
-            self.stream_options.max_message_length,
-        );
+        const message = try self.reader.interface().takeDelimiterExclusive('\n');
+        self.debugPrint("{s} read: {s}", .{ self.name, message });
+        return message;
     }
     pub fn readJSON(
-        self: Client,
+        self: *Client,
         allocator: std.mem.Allocator,
         comptime T: type,
     ) !T {
-        const message = try self.readMessage(allocator);
+        const message = try self.readMessage();
         return try std.json.parseFromSliceLeaky(
             T,
             allocator,
@@ -75,8 +81,8 @@ pub const Client = struct {
     }
     fn addMessage(self: *Client, message: []const u8) !void {
         self.mutex.lock();
-        try self.buffer.appendSlice(message);
-        try self.buffer.append('\n');
+        try self.buffer.appendSlice(self.allocator, message);
+        try self.buffer.append(self.allocator, '\n');
         self.mutex.unlock();
         // Notify any waiting threads that a new message has been added
         self.condition.signal();
@@ -88,7 +94,7 @@ pub const Client = struct {
     }
     fn readLoop(self: *Client) !void {
         while (true) {
-            const message = self.readMessage(self.buffer.allocator) catch |err| {
+            const message = self.readMessage() catch |err| {
                 if (err == error.EndOfStream) {
                     self.debugPrint("End of stream reached, stopping read loop.", .{});
                     return;
@@ -100,7 +106,6 @@ pub const Client = struct {
                 self.debugPrint("Error adding message: {}", .{err});
                 return err;
             };
-            self.buffer.allocator.free(message);
         }
     }
     pub fn checkNewMessage(self: *Client) bool {
@@ -167,8 +172,9 @@ pub const Client = struct {
         try std.posix.shutdown(self.stream.handle, .both);
         self.debugPrint("Deinitializing client\n", .{});
         // Wait for the read loop to finish
-        std.time.sleep(std.time.ns_per_ms * 1000);
-        self.buffer.deinit();
+        std.posix.nanosleep(1, 0);
+        self.allocator.free(self.reader.interface().buffer);
+        self.buffer.deinit(self.allocator);
     }
     pub fn clearBuffer(self: *Client) void {
         self.buffer.clearAndFree();

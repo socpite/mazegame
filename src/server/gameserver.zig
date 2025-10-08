@@ -74,7 +74,7 @@ const Match = struct {
         const file = try log_dir.createFile(full_name, .{});
         defer file.close();
         self.evaluator.logToFile(file) catch |err| {
-            std.debug.print("Log to file failed: {}\n", .{err});
+            std.debug.print("Log to file failed: {any}\n", .{err});
         };
     }
     fn requestMaze(self: *Match) !void {
@@ -103,7 +103,7 @@ const Match = struct {
         }
         const check_result = try Checker.checkEligible(self.game, new_game, .{});
         if (check_result != .Valid) {
-            std.debug.print("Maze check failed with status: {}\n", .{check_result});
+            std.debug.print("Maze check failed with status: {any}\n", .{check_result});
             return MatchError.InvalidMaze;
         }
         // This ensures that board is still owned by the game arena allocator
@@ -129,7 +129,7 @@ const Match = struct {
     fn start(self: *Match) !void {
         std.debug.print("Match started with {s}\n", .{self.mazer_client.name});
         self.requestMaze() catch |err| {
-            std.debug.print("Request maze failed: {}\n", .{err});
+            std.debug.print("Request maze failed: {any}\n", .{err});
             return self.messageFinished(1.0);
         };
         self.evaluator = try Evaluator.init(
@@ -156,11 +156,11 @@ const Match = struct {
                 GameLib.GameTurn,
                 null,
             ) catch |err| {
-                std.debug.print("Read move failed: {}\n", .{err});
+                std.debug.print("Read move failed: {any}\n", .{err});
                 return self.messageFinished(0.0);
             };
             self.game.doTurn(move_recieved) catch |err| {
-                std.debug.print("Move failed: {}\n", .{err});
+                std.debug.print("Move failed: {any}\n", .{err});
                 return self.messageFinished(0.0);
             };
             try self.evaluator.addTurn(limited_vision_game, move_recieved);
@@ -168,7 +168,7 @@ const Match = struct {
         try self.gamer_client.writeMessage("Game finished");
         try self.mazer_client.writeMessage("Game finished");
         if (self.game.isFinished()) {
-            std.debug.print("Game finished {}\n", .{try self.evaluator.calculateScore()});
+            std.debug.print("Game finished {any}\n", .{try self.evaluator.calculateScore()});
             return self.messageFinished(try self.evaluator.calculateScore());
         } else {
             return self.messageFinished(0.0);
@@ -187,16 +187,16 @@ pub const Series = struct {
     client_1: *Client,
     client_2: *Client,
     const ROUND_COUNT = 3;
-    pub fn init(allocator: std.mem.Allocator, client_1: Connection, client_2: Connection) !Series {
+    pub fn init(allocator: std.mem.Allocator, client_1: *Connection, client_2: *Connection) !Series {
         const new_client_1 = try allocator.create(Client);
         const new_client_2 = try allocator.create(Client);
-        new_client_1.* = Client.init(
+        new_client_1.* = try Client.init(
             allocator,
             client_1.stream,
             .{},
             "mazer",
         );
-        new_client_2.* = Client.init(
+        new_client_2.* = try Client.init(
             allocator,
             client_2.stream,
             .{},
@@ -244,10 +244,10 @@ pub const Series = struct {
     }
     pub fn deinit(self: Series) void {
         self.client_1.deinit() catch |err| {
-            std.debug.print("Client 1 deinit failed: {}\n", .{err});
+            std.debug.print("Client 1 deinit failed: {any}\n", .{err});
         };
         self.client_2.deinit() catch |err| {
-            std.debug.print("Client 2 deinit failed: {}\n", .{err});
+            std.debug.print("Client 2 deinit failed: {any}\n", .{err});
         };
         self.allocator.destroy(self.client_1);
         self.allocator.destroy(self.client_2);

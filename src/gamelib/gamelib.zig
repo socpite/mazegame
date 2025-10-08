@@ -237,7 +237,7 @@ pub fn getGameAsJsonString(
     defer arena.deinit();
     const arena_allocator = arena.allocator();
     const game_json = try getJSONFromGame(game, arena_allocator);
-    const json_string = try std.json.stringifyAlloc(
+    const json_string = try std.json.Stringify.valueAlloc(
         allocator,
         game_json,
         .{},

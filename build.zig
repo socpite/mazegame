@@ -36,12 +36,6 @@ pub fn build(b: *std.Build) void {
         .root_module = server_module,
     });
 
-    const file_server = b.dependency("StaticHttpFileServer", .{
-        .target = target,
-        .optimize = optimize,
-    });
-    const file_server_module = file_server.module("StaticHttpFileServer");
-    server.root_module.addImport("StaticHttpFileServer", file_server_module);
     server.root_module.addImport("gamelib", gamelib_module);
     server.linkLibC();
     b.installArtifact(server);
@@ -52,7 +46,6 @@ pub fn build(b: *std.Build) void {
         .name = "mazegame",
         .root_module = server_module,
     });
-    server_check.root_module.addImport("StaticHttpFileServer", file_server_module);
     server_check.root_module.addImport("gamelib", gamelib_module);
     server_check.linkLibC();
     check.dependOn(&server_check.step);
@@ -100,10 +93,16 @@ pub fn build(b: *std.Build) void {
     run_client_step.dependOn(&client_run_exe.step);
     // Creates a step for unit testing. This only builds the test executable
     // but does not run it.
-    const exe_unit_tests = b.addTest(.{
+
+    const test_module = b.addModule("test", .{
         .root_source_file = b.path("src/alltests.zig"),
         .target = target,
         .optimize = optimize,
+    });
+
+    const exe_unit_tests = b.addTest(.{
+        .name = "test",
+        .root_module = test_module,
     });
     exe_unit_tests.root_module.addImport("gamelib", gamelib_module);
     exe_unit_tests.linkLibC();

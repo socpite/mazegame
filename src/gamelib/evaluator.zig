@@ -11,7 +11,7 @@ pub const Evaluator = struct {
 
     const FullMatchInfo = struct {
         original_game_json: []const u8,
-        turn_info_list: std.ArrayList(FullTurnInfo),
+        turn_info_list: std.array_list.Aligned(FullTurnInfo, null),
         optimal_path_length: i32,
         fn getScore(self: FullMatchInfo) f32 {
             return @as(f32, @floatFromInt(self.optimal_path_length)) /
@@ -40,18 +40,18 @@ pub const Evaluator = struct {
                     allocator,
                 ),
                 .optimal_path_length = optimal_path_length,
-                .turn_info_list = std.ArrayList(FullTurnInfo).init(allocator),
+                .turn_info_list = std.array_list.Aligned(FullTurnInfo, null).empty,
             },
         };
     }
 
     pub fn addTurn(self: *Evaluator, maze_sent: Gamelib.Game, turn: Gamelib.GameTurn) !void {
-        try self.match_info.turn_info_list.append(.{
+        try self.match_info.turn_info_list.append(self.allocator, .{
             .maze_sent_json = try Gamelib.getGameAsJsonString(
                 maze_sent,
                 self.allocator,
             ),
-            .gamer_turn_json = try std.json.stringifyAlloc(
+            .gamer_turn_json = try std.json.Stringify.valueAlloc(
                 self.allocator,
                 turn,
                 .{},
@@ -67,15 +67,15 @@ pub const Evaluator = struct {
     }
 
     pub fn logToFile(self: Evaluator, file: std.fs.File) !void {
-        const writer = file.writer();
-        try std.json.stringify(
+        var writer = file.writer(&.{});
+        try std.json.Stringify.value(
             FullMatchInfoJSON{
                 .original_game_json = self.match_info.original_game_json,
                 .turn_info_list = self.match_info.turn_info_list.items,
                 .optimal_path_length = self.match_info.optimal_path_length,
             },
             .{},
-            writer,
+            &writer.interface,
         );
     }
     pub fn deinit(self: Evaluator) void {

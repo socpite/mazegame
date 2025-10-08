@@ -39,7 +39,7 @@ pub const Bomb = struct {
     }
     fn jsonStringify(ctx: *anyopaque, allocator: std.mem.Allocator) error{OutOfMemory}![]u8 {
         const self: *Bomb = @ptrCast(@alignCast(ctx));
-        const obj_json = try std.json.stringifyAlloc(allocator, self.*, .{});
+        const obj_json = try std.json.Stringify.valueAlloc(allocator, self.*, .{});
         return std.mem.concat(allocator, u8, &.{ name, ";", obj_json });
     }
     pub fn newItem(allocator: std.mem.Allocator) !Item {
@@ -95,7 +95,7 @@ pub fn jsonToItem(json: []const u8, arena: std.mem.Allocator) !Item {
 }
 
 pub fn genItemList(name_list: []const []const u8, allocator: std.mem.Allocator) ![]GameLib.Item {
-    var array = std.ArrayList(GameLib.Item).init(allocator);
+    var array = std.array_list.Managed(GameLib.Item).init(allocator);
     for (name_list) |name| {
         try array.append(try strToItem(name, allocator));
     }
