@@ -69,7 +69,8 @@
       .then(res => res.json())
       .then(schema => {
         const container = document.getElementById('schema-editor');
-        const editor = new JSONEditor(container, { schema, mode: 'view' });
+        const editor = new JSONEditor(container, { mode: 'tree', modes: ['tree','view'] });
+        editor.set(schema);
       });
   </script>
 </body>
