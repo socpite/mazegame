@@ -30,8 +30,12 @@
       .then(res => res.json())
       .then(schema => {
         const container = document.getElementById('schema-editor');
-        const editor = new JSONEditor(container, { mode: 'tree', modes: ['tree','view'] });
-        editor.set(schema);
+        const editor = new JSONEditor(container, { mode: 'tree', modes: ['tree'] });
+        editor.set({
+          direction: schema.oneOf[0].properties.direction,
+          item_name: schema.oneOf[1].properties.item_name
+        });
+        editor.collapseAll();
       });
   </script>
 
