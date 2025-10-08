@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Bot Guide</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>Writing a MazeGame Bot</h1>
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="game.html">Game JSON</a>
+    <a href="move.html">Move JSON</a>
+    <a href="bot.html">Bot Guide</a>
+  </nav>
+
+  <h2>Overview</h2>
+  <p>Create a bot that communicates via STDIN/STDOUT or socket using the provided client libraries.</p>
+
+  <h2>Python Example</h2>
+  <p>Edit <code>sample_bot/bot.py</code>:</p>
+  <pre><code>def prepare_solver():
+    # Optional init steps
+    pass
+
+def get_game(game):
+    # game is a dict matching the Game JSON schema
+    return game
+
+def get_move(game):
+    # return a dict matching the Move JSON schema
+    return {"direction": "Right"}
+</code></pre>
+  <p>Run your bot against the server:</p>
+  <pre><code>python3 python_client/client.py --name sample_bot --ip 127.0.0.1</code></pre>
+
+  <h2>Zig Example</h2>
+  <p>Implement the same API in <code>src/client/playerloader.zig</code>:
+     <code>CGameMoveToGameTurn</code>, <code>getMove</code>, <code>getGame</code>.
+  </p>
+
+  <h2>Use JSON Schemas</h2>
+  <p>Reference the interactive schemas to ensure payloads match:</p>
+  <ul>
+    <li><a href="schemas/game.schema.json">Game schema</a></li>
+    <li><a href="schemas/move.schema.json">Move schema</a></li>
+  </ul>
+</body>
+</html>
