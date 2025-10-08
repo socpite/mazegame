@@ -73,5 +73,24 @@
         editor.set(schema);
       });
   </script>
+
+  <h2>Definitions</h2>
+  <dl>
+    <dt><code>Vec2</code></dt>
+    <dd>2-element integer array [row, col], both ≥0 and less than board dimensions.</dd>
+    <dt><code>WallType</code></dt>
+    <dd>"VisibleWall" | "NoWall" | "NotVisible" | "BorderWall"</dd>
+    <dt><code>MazeBoard</code></dt>
+    <dd>
+      <ul>
+        <li><code>height</code>: integer ≥1</li>
+        <li><code>width</code>: integer ≥1</li>
+        <li><code>vertical_walls</code>, <code>horizontal_walls</code>: grid of WallType</li>
+        <li><code>luminated_tiles</code>: grid of boolean</li>
+        <li><code>buffer_board</code>: grid of integer</li>
+        <li><code>item_board</code>: grid of nullable string</li>
+      </ul>
+    </dd>
+  </dl>
 </body>
 </html>
